@@ -67,13 +67,19 @@ function App() {
     }, [])
 
     const onSubmit = async () => {
-        if (!accessToken) {
-            toast({
-                title: '请先设置AccessToken',
-                description: '在左下角的设置中设置AccessToken',
-                variant: 'destructive',
-            })
-            return
+        let _accessToken = accessToken
+        if (!_accessToken) {
+            const store = await useStore()
+            _accessToken = await store.getAccessToken()
+            if (!_accessToken) {
+                toast({
+                    title: '请先设置AccessToken',
+                    description: '点击左下角的设置按钮填写AccessToken',
+                    variant: 'destructive',
+                })
+                return
+            }
+            setAccessToken(_accessToken)
         }
         setLoading(true)
         try {
@@ -81,7 +87,7 @@ function App() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
+                    'Authorization': `Bearer ${_accessToken}`,
                 },
                 body: JSON.stringify({
                     content,
@@ -107,9 +113,10 @@ function App() {
                     ),
                 })
             } else {
+                const {error} = await resp.json();
                 toast({
                     title: '发布失败',
-                    description: '请检查网络或AccessToken是否正确',
+                    description: error||'请检查网络或AccessToken是否正确',
                     variant: 'destructive',
                 })
             }
