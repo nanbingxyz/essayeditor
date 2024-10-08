@@ -56,7 +56,7 @@ export default function SettingsDialog() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader className="sm:justify-start text-left">
-                    <DialogTitle>设置</DialogTitle>
+                    <DialogTitle className="text-primary">设置</DialogTitle>
                     <DialogDescription>
                         AccessToken 在个人设置中的"API 设置"中可以获取
                     </DialogDescription>
@@ -68,7 +68,7 @@ export default function SettingsDialog() {
                         </Label>
                         <div className="flex justify-start items-center border rounded">
                             <Input
-                                className="outline-none flex-1 border-none shadow-none focus-visible:ring-0"
+                                className="outline-none flex-1 border-none shadow-none focus-visible:ring-0 text-primary"
                                 onInput={onInput}
                                 placeholder="Your Access Token"
                                 value={accessToken}
@@ -80,7 +80,7 @@ export default function SettingsDialog() {
                                     variant="ghost"
                                     onClick={() => setInputType('text')}
                                 >
-                                    <EyeOpenIcon />
+                                    <EyeOpenIcon  className="text-muted-foreground" />
                                 </Button>
                             ) : (
                                 <Button
@@ -88,7 +88,7 @@ export default function SettingsDialog() {
                                     variant="ghost"
                                     onClick={() => setInputType('password')}
                                 >
-                                    <EyeClosedIcon />
+                                    <EyeClosedIcon className="text-muted-foreground" />
                                 </Button>
                             )}
                         </div>
@@ -98,8 +98,8 @@ export default function SettingsDialog() {
                     <div className="flex justify-end items-center gap-2">
                         <DialogClose asChild>
                             <Button type="button" variant="ghost">
-                                取消
-                            </Button>
+                            <span className="text-muted-foreground">取消</span>
+                        </Button>
                         </DialogClose>
                         <Button type="button" onClick={onSave}>
                             保存
