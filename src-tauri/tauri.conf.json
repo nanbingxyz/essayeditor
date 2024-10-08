@@ -1,0 +1,53 @@
+{
+    "$schema": "https://schema.tauri.app/config/2.0.0",
+    "productName": "essay",
+    "version": "0.1.0",
+    "identifier": "ink.essay.editor",
+    "build": {
+        "beforeDevCommand": "pnpm dev",
+        "devUrl": "http://localhost:1420",
+        "beforeBuildCommand": "pnpm build",
+        "frontendDist": "../dist"
+    },
+    "app": {
+        "macOSPrivateApi": true,
+        "windows": [
+            {
+                "title": "Essay",
+                "width": 800,
+                "height": 600,
+                "minWidth": 400,
+                "minHeight": 500,
+                "titleBarStyle": "Overlay"
+            }
+        ],
+        "security": {
+            "csp": null
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": [
+            "icons/32x32.png",
+            "icons/128x128.png",
+            "icons/128x128@2x.png",
+            "icons/icon.icns",
+            "icons/icon.ico"
+        ],
+        "createUpdaterArtifacts": true
+    },
+    "plugins": {
+        "updater": {
+            "active": true,
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE1OTkzNjRBN0FFQjc4MDcKUldRSGVPdDZTamFacFYxOHlnNnR0RDhmeFhic245SW9GYU1uM242MzJSaEJUbU96RGxKYlE4L00K",
+            "endpoints": [
+                "https://github.com/nanbingxzy/essayeditor/releases/latest/download/latest.json"
+            ],
+            "dialog": true
+        },
+        "windows": {
+            "installMode": "passive"
+        }
+    }
+}
