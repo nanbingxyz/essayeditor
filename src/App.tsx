@@ -124,7 +124,7 @@ function App() {
                 <textarea
                     placeholder="从这里开始..."
                     disabled={loading}
-                    className="text-base border-none w-full h-full resize-none text-primary"
+                    className="text-base border-none w-full h-full resize-none text-primary py-6 px-12"
                     value={content}
                     onChange={onInput}
                 ></textarea>
