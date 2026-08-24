@@ -4,6 +4,10 @@ import App from "./App";
 import { Toaster } from "@/components/ui/toaster";
 import Updater from "./components/updater";
 
+document.documentElement.dataset.platform = navigator.userAgent.includes('Mac')
+  ? 'macos'
+  : 'windows'
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <App />

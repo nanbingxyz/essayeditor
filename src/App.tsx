@@ -2,22 +2,50 @@ import './App.css'
 import '@fontsource-variable/noto-serif-sc'
 import {fetch} from '@tauri-apps/plugin-http'
 import {open} from '@tauri-apps/plugin-shell'
+import {GearIcon, PaperPlaneIcon, ShadowInnerIcon} from '@radix-ui/react-icons'
+import {CircleUserRound, PanelLeftClose, PanelLeftOpen} from 'lucide-react'
+import {ChangeEvent, useCallback, useEffect, useRef, useState} from 'react'
+
+import SettingsPage, {ApiKeySaveStatus} from '@/components/settings-page'
+import {Button} from '@/components/ui/button'
+import {ToastAction} from '@/components/ui/toast'
+import useStore, {EssayStore} from '@/hooks/use-store'
 import {useToast} from '@/hooks/use-toast'
-import useStore from '@/hooks/use-store'
-import {ChangeEvent, useCallback, useEffect, useState} from 'react'
 
 import {debounce, getRelativeTime} from './utils'
-import {Button} from './components/ui/button'
-import {PaperPlaneIcon, ShadowInnerIcon} from '@radix-ui/react-icons'
-import SettingsDialog from './components/settings-dialog'
-import {ToastAction} from './components/ui/toast'
+
+type AppPage = 'editor' | 'settings'
+
+const SIDEBAR_BREAKPOINT = 500
+const API_KEY_SAVE_DELAY = 400
 
 function App() {
     const {toast} = useToast()
+    const [page, setPage] = useState<AppPage>('editor')
     const [backTimestamp, setBackTimestamp] = useState(0)
     const [accessToken, setAccessToken] = useState('')
+    const [apiKeyDraft, setApiKeyDraft] = useState('')
+    const [apiKeySaveStatus, setApiKeySaveStatus] =
+        useState<ApiKeySaveStatus>('idle')
+    const [storeReady, setStoreReady] = useState(false)
     const [loading, setLoading] = useState(false)
     const [content, setContent] = useState('')
+    const [isNarrow, setIsNarrow] = useState(
+        () => window.innerWidth < SIDEBAR_BREAKPOINT
+    )
+    const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(true)
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+    const storeRef = useRef<EssayStore>()
+    const apiKeyDraftRef = useRef('')
+    const accessTokenRef = useRef('')
+    const apiKeySaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
+    const apiKeySaveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true))
+    const apiKeySaveGenerationRef = useRef(0)
+
+    const sidebarVisible = isNarrow
+        ? mobileSidebarOpen
+        : desktopSidebarVisible
 
     const restoreBackup = () => {
         const backup = localStorage.getItem('backup')
@@ -42,52 +70,180 @@ function App() {
                 setBackTimestamp(timestamp)
             }
         }, 1000),
-        [debounce]
+        []
     )
+
+    const enqueueApiKeySave = useCallback((value: string) => {
+        const store = storeRef.current
+        if (!store) {
+            setApiKeySaveStatus('error')
+            return Promise.resolve(false)
+        }
+
+        const normalizedValue = value.trim()
+        const generation = ++apiKeySaveGenerationRef.current
+        setApiKeySaveStatus('saving')
+
+        const saveTask = apiKeySaveQueueRef.current.then(async () => {
+            try {
+                await store.saveAccessToken(normalizedValue)
+                if (generation === apiKeySaveGenerationRef.current) {
+                    accessTokenRef.current = normalizedValue
+                    setAccessToken(normalizedValue)
+                    setApiKeySaveStatus('saved')
+                }
+                return true
+            } catch {
+                if (generation === apiKeySaveGenerationRef.current) {
+                    setApiKeySaveStatus('error')
+                }
+                return false
+            }
+        })
+
+        apiKeySaveQueueRef.current = saveTask
+        return saveTask
+    }, [])
+
+    const flushApiKeySave = useCallback(async () => {
+        if (apiKeySaveTimerRef.current) {
+            clearTimeout(apiKeySaveTimerRef.current)
+            apiKeySaveTimerRef.current = undefined
+            return enqueueApiKeySave(apiKeyDraftRef.current)
+        }
+
+        if (apiKeyDraftRef.current.trim() !== accessTokenRef.current) {
+            return enqueueApiKeySave(apiKeyDraftRef.current)
+        }
+
+        return apiKeySaveQueueRef.current
+    }, [enqueueApiKeySave])
+
+    const scheduleApiKeySave = (value: string) => {
+        apiKeyDraftRef.current = value
+        setApiKeyDraft(value)
+        setApiKeySaveStatus('saving')
+
+        if (apiKeySaveTimerRef.current) {
+            clearTimeout(apiKeySaveTimerRef.current)
+        }
+
+        apiKeySaveTimerRef.current = setTimeout(() => {
+            apiKeySaveTimerRef.current = undefined
+            void enqueueApiKeySave(apiKeyDraftRef.current)
+        }, API_KEY_SAVE_DELAY)
+    }
+
+    useEffect(() => {
+        let cancelled = false
+
+        const initializeStore = async () => {
+            try {
+                const store = await useStore()
+                if (cancelled) {
+                    return
+                }
+                storeRef.current = store
+                const storedAccessToken = (await store.getAccessToken()).trim()
+                if (cancelled) {
+                    return
+                }
+                accessTokenRef.current = storedAccessToken
+                apiKeyDraftRef.current = storedAccessToken
+                setAccessToken(storedAccessToken)
+                setApiKeyDraft(storedAccessToken)
+            } catch {
+                if (!cancelled) {
+                    setApiKeySaveStatus('error')
+                    toast({
+                        title: '无法读取本地设置',
+                        description: '请稍后重试',
+                        variant: 'destructive',
+                    })
+                }
+            } finally {
+                if (!cancelled) {
+                    setStoreReady(true)
+                }
+            }
+        }
+
+        void initializeStore()
+        restoreBackup()
+
+        return () => {
+            cancelled = true
+        }
+    }, [toast])
+
+    useEffect(() => {
+        const handleResize = () => {
+            const nextIsNarrow = window.innerWidth < SIDEBAR_BREAKPOINT
+            setIsNarrow((currentIsNarrow) => {
+                if (currentIsNarrow !== nextIsNarrow) {
+                    setMobileSidebarOpen(false)
+                }
+                return nextIsNarrow
+            })
+        }
+
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    useEffect(() => {
+        return () => {
+            if (apiKeySaveTimerRef.current) {
+                clearTimeout(apiKeySaveTimerRef.current)
+            }
+        }
+    }, [])
+
+    const toggleSidebar = () => {
+        if (isNarrow) {
+            setMobileSidebarOpen((open) => !open)
+        } else {
+            setDesktopSidebarVisible((visible) => !visible)
+        }
+    }
+
+    const openSettings = () => {
+        setPage('settings')
+        if (isNarrow) {
+            setMobileSidebarOpen(false)
+        }
+    }
+
+    const returnToEditor = async () => {
+        const saved = await flushApiKeySave()
+        if (saved) {
+            setPage('editor')
+        }
+    }
 
     const onInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
         setContent(event.target.value)
         backup(event.target.value)
     }
 
-    useEffect(() => {
-        useStore().then(async (store) => {
-            const accessToken = await store.getAccessToken()
-            if (!accessToken) {
-                toast({
-                    title: '请先设置AccessToken',
-                    description: '在左下角的设置中设置AccessToken',
-                    variant: 'destructive',
-                })
-            } else {
-                setAccessToken(accessToken)
-            }
-        })
-        restoreBackup()
-    }, [])
-
     const onSubmit = async () => {
-        let _accessToken = accessToken
-        if (!_accessToken) {
-            const store = await useStore()
-            _accessToken = await store.getAccessToken()
-            if (!_accessToken) {
-                toast({
-                    title: '请先设置AccessToken',
-                    description: '点击左下角的设置按钮填写AccessToken',
-                    variant: 'destructive',
-                })
-                return
-            }
-            setAccessToken(_accessToken)
+        if (!accessToken) {
+            openSettings()
+            toast({
+                title: '请先设置 API Key',
+                description: '填写后会自动保存在当前设备',
+                variant: 'destructive',
+            })
+            return
         }
+
         setLoading(true)
         try {
             const resp = await fetch('https://api.essay.ink/essays', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${_accessToken}`,
+                    'Authorization': `Bearer ${accessToken}`,
                 },
                 body: JSON.stringify({
                     content,
@@ -113,10 +269,10 @@ function App() {
                     ),
                 })
             } else {
-                const {error} = await resp.json();
+                const {error} = await resp.json()
                 toast({
                     title: '发布失败',
-                    description: error||'请检查网络或AccessToken是否正确',
+                    description: error || '请检查网络或 API Key 是否正确',
                     variant: 'destructive',
                 })
             }
@@ -126,34 +282,137 @@ function App() {
     }
 
     return (
-        <div className="h-full flex flex-col">
-            <div className="flex-1 pt-6">
-                <textarea
-                    placeholder="从这里开始..."
-                    disabled={loading}
-                    className="text-base border-none w-full h-full resize-none text-primary py-6 px-12"
-                    value={content}
-                    onChange={onInput}
-                ></textarea>
-            </div>
-            <div className="p-2">
-                <div className="flex justify-between items-center ">
-                    <div className="flex justify-start items-center">
-                        <SettingsDialog />
-                        {backTimestamp !== 0 && (
-                            <span className="text-xs text-muted-foreground font-bold">
-                                last saved{' '}
-                                {getRelativeTime(new Date(backTimestamp))}
-                            </span>
+        <div
+            className={`app-shell ${isNarrow ? 'is-narrow' : 'is-wide'} ${
+                sidebarVisible ? 'sidebar-is-visible' : 'sidebar-is-hidden'
+            }`}
+        >
+            {isNarrow && mobileSidebarOpen && (
+                <button
+                    type="button"
+                    className="sidebar-backdrop"
+                    aria-label="关闭侧边栏"
+                    onClick={() => setMobileSidebarOpen(false)}
+                />
+            )}
+
+            <aside className="app-sidebar" aria-hidden={!sidebarVisible}>
+                <div data-tauri-drag-region className="titlebar-surface sidebar-titlebar">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="sidebar-toggle"
+                        aria-label="收起侧边栏"
+                        title="收起侧边栏"
+                        tabIndex={sidebarVisible ? 0 : -1}
+                        onClick={toggleSidebar}
+                    >
+                        <PanelLeftClose aria-hidden="true" />
+                    </Button>
+                </div>
+
+                <div className="sidebar-spacer" />
+
+                <footer className="sidebar-footer">
+                    <div className="sidebar-account-slot">
+                        {!storeReady ? (
+                            <div className="sidebar-account-skeleton" aria-label="正在读取本地设置" />
+                        ) : accessToken ? (
+                            <div className="sidebar-user" aria-label="当前用户：Essay 用户">
+                                <CircleUserRound aria-hidden="true" />
+                                <span>Essay 用户</span>
+                            </div>
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="set-api-key-button"
+                                onClick={openSettings}
+                            >
+                                设置 API Key
+                            </Button>
                         )}
                     </div>
-                    <div>
-                        <Button onClick={onSubmit} disabled={loading} className='rounded-full mr-2'>
-                            {loading ? <ShadowInnerIcon className="animate-spin" />: <PaperPlaneIcon />}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="settings-button"
+                        aria-label="打开设置"
+                        title="设置"
+                        onClick={openSettings}
+                    >
+                        <GearIcon />
+                    </Button>
+                </footer>
+            </aside>
+
+            <main className="app-main">
+                <div data-tauri-drag-region className="titlebar-surface main-titlebar">
+                    {!sidebarVisible && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="sidebar-toggle"
+                            aria-label="显示侧边栏"
+                            title="显示侧边栏"
+                            onClick={toggleSidebar}
+                        >
+                            <PanelLeftOpen aria-hidden="true" />
                         </Button>
-                    </div>
+                    )}
                 </div>
-            </div>
+
+                <div className="main-page-container">
+                    {page === 'editor' ? (
+                        <div className="editor-page">
+                            <textarea
+                                placeholder="从这里开始..."
+                                disabled={loading}
+                                className="editor-textarea"
+                                value={content}
+                                onChange={onInput}
+                            />
+                            <footer className="editor-footer">
+                                <div>
+                                    {backTimestamp !== 0 && (
+                                        <span className="backup-status">
+                                            last saved{' '}
+                                            {getRelativeTime(new Date(backTimestamp))}
+                                        </span>
+                                    )}
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    className="publish-button"
+                                    aria-label="发布文章"
+                                    title="发布"
+                                    disabled={loading || !storeReady}
+                                    onClick={onSubmit}
+                                >
+                                    {loading ? (
+                                        <ShadowInnerIcon className="animate-spin" />
+                                    ) : (
+                                        <PaperPlaneIcon />
+                                    )}
+                                </Button>
+                            </footer>
+                        </div>
+                    ) : (
+                        <SettingsPage
+                            value={apiKeyDraft}
+                            saveStatus={apiKeySaveStatus}
+                            disabled={!storeReady}
+                            onChange={scheduleApiKeySave}
+                            onBlur={() => void flushApiKeySave()}
+                            onBack={returnToEditor}
+                        />
+                    )}
+                </div>
+            </main>
         </div>
     )
 }
