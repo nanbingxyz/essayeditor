@@ -1,4 +1,4 @@
-import {createStore} from '@tauri-apps/plugin-store'
+import {load} from '@tauri-apps/plugin-store'
 
 
 export interface EssayStore{
@@ -8,7 +8,7 @@ export interface EssayStore{
 
 export default async function useStore():Promise<EssayStore> {
     
-    const store = await createStore('store.bin')
+    const store = await load('store.bin')
 
     const saveAccessToken = async (accessToken: string) => {
         await store.set('accessToken', accessToken)
