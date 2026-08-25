@@ -11,6 +11,9 @@ importers:
       '@fontsource-variable/noto-serif-sc':
         specifier: ^5.1.0
         version: 5.3.0
+      '@fontsource/barlow':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@radix-ui/react-dialog':
         specifier: ^1.1.2
         version: 1.1.23(@types/react-dom@18.2.7)(@types/react@18.3.31)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -338,6 +341,9 @@ packages:
 
   '@fontsource-variable/noto-serif-sc@5.3.0':
     resolution: {integrity: sha512-7LcN2NEf4HDjoSkGWc79WqDDyMK8JvSPdA/gsHjJpZ8l9A9mcK/GQTazp3klmkBwJooy0eqeNvlmaZFXPupHrA==}
+
+  '@fontsource/barlow@5.3.0':
+    resolution: {integrity: sha512-tGR0y6QObRtKv71MOth44222+mdNFM/ZWFWDV1VLzNbG4oK9PNRlyJzmkck4vHAi9ibHBXgt4SlY51amFP55CA==}
 
   '@jridgewell/gen-mapping@0.3.12':
     resolution: {integrity: sha512-OuLGC46TjB5BbN1dH8JULVVZY4WTdkF7tV9Ys6wLL1rubZnCMstOhNHueU5bLCrnRuDhKPDM4g6sw4Bel5Gzqg==}
@@ -1722,6 +1728,8 @@ snapshots:
     optional: true
 
   '@fontsource-variable/noto-serif-sc@5.3.0': {}
+
+  '@fontsource/barlow@5.3.0': {}
 
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:

@@ -71,7 +71,7 @@
 
 * {
     box-sizing: border-box;
-    font-family: 'Noto Serif SC Variable', serif;
+    font-family: 'Barlow', sans-serif;
 }
 
 html,
@@ -262,6 +262,7 @@ html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
     outline: 0;
     color: hsl(var(--foreground));
     background: transparent;
+    font-family: 'Noto Serif SC Variable', serif;
     font-size: 16px;
     line-height: 30px;
 }

@@ -1,4 +1,8 @@
 import './App.css'
+import '@fontsource/barlow/latin-400.css'
+import '@fontsource/barlow/latin-500.css'
+import '@fontsource/barlow/latin-600.css'
+import '@fontsource/barlow/latin-700.css'
 import '@fontsource-variable/noto-serif-sc'
 import {fetch} from '@tauri-apps/plugin-http'
 import {open} from '@tauri-apps/plugin-shell'
