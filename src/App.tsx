@@ -291,6 +291,7 @@ function App() {
                 <button
                     type="button"
                     className="sidebar-backdrop"
+                    style={{ strokeWidth: 1 }}
                     aria-label="关闭侧边栏"
                     onClick={() => setMobileSidebarOpen(false)}
                 />
@@ -298,18 +299,16 @@ function App() {
 
             <aside className="app-sidebar" aria-hidden={!sidebarVisible}>
                 <div data-tauri-drag-region className="titlebar-surface sidebar-titlebar">
-                    <Button
+                    <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="sidebar-toggle"
+                        className="sidebar-toggle ml-2"
                         aria-label="收起侧边栏"
                         title="收起侧边栏"
                         tabIndex={sidebarVisible ? 0 : -1}
                         onClick={toggleSidebar}
                     >
-                        <PanelLeftClose aria-hidden="true" />
-                    </Button>
+                        <PanelLeftClose aria-hidden="true" style={{ strokeWidth: 1 }} />
+                    </button>
                 </div>
 
                 <div className="sidebar-spacer" />
@@ -351,17 +350,15 @@ function App() {
             <main className="app-main">
                 <div data-tauri-drag-region className="titlebar-surface main-titlebar">
                     {!sidebarVisible && (
-                        <Button
+                        <button
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="sidebar-toggle"
+                            className="sidebar-toggle ml-2"
                             aria-label="显示侧边栏"
                             title="显示侧边栏"
                             onClick={toggleSidebar}
                         >
-                            <PanelLeftOpen aria-hidden="true" />
-                        </Button>
+                            <PanelLeftOpen aria-hidden="true" style={{ strokeWidth: 1 }} />
+                        </button>
                     )}
                 </div>
 

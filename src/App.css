@@ -133,6 +133,10 @@ textarea {
     padding: 6px 12px;
 }
 
+html[data-platform='macos'] {
+    --macos-titlebar-toggle-offset-y: -7px;
+}
+
 html[data-platform='macos'] .sidebar-titlebar,
 html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     padding-left: 76px;
@@ -143,6 +147,12 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     width: 32px;
     height: 32px;
     color: hsl(var(--muted-foreground));
+}
+
+/* Align the 23px web control center with the AppKit overlay traffic lights. */
+html[data-platform='macos'] .sidebar-titlebar > .sidebar-toggle,
+html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
+    transform: translateY(var(--macos-titlebar-toggle-offset-y));
 }
 
 .sidebar-toggle svg {
