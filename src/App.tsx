@@ -8,8 +8,11 @@ import {fetch} from '@tauri-apps/plugin-http'
 import {open} from '@tauri-apps/plugin-shell'
 import {GearIcon, PaperPlaneIcon, ShadowInnerIcon} from '@radix-ui/react-icons'
 import {CircleUserRound, PanelLeftClose, PanelLeftOpen} from 'lucide-react'
-import {ChangeEvent, useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 
+import MarkdownEditor, {
+    MarkdownEditorHandle,
+} from '@/components/markdown-editor'
 import SettingsPage, {ApiKeySaveStatus} from '@/components/settings-page'
 import {Button} from '@/components/ui/button'
 import {ToastAction} from '@/components/ui/toast'
@@ -23,17 +26,46 @@ type AppPage = 'editor' | 'settings'
 const SIDEBAR_BREAKPOINT = 500
 const API_KEY_SAVE_DELAY = 400
 
+interface LocalBackup {
+    content: string
+    timestamp: number
+}
+
+function readBackup(): LocalBackup {
+    const emptyBackup = {content: '', timestamp: 0}
+    const serializedBackup = localStorage.getItem('backup')
+    if (!serializedBackup) {
+        return emptyBackup
+    }
+
+    try {
+        const backup = JSON.parse(serializedBackup) as Partial<LocalBackup>
+        if (
+            typeof backup.content !== 'string' ||
+            typeof backup.timestamp !== 'number' ||
+            !Number.isFinite(backup.timestamp)
+        ) {
+            return emptyBackup
+        }
+        return {content: backup.content, timestamp: backup.timestamp}
+    } catch {
+        return emptyBackup
+    }
+}
+
 function App() {
     const {toast} = useToast()
+    const [initialBackup] = useState(readBackup)
     const [page, setPage] = useState<AppPage>('editor')
-    const [backTimestamp, setBackTimestamp] = useState(0)
+    const [backTimestamp, setBackTimestamp] = useState(
+        initialBackup.timestamp
+    )
     const [accessToken, setAccessToken] = useState('')
     const [apiKeyDraft, setApiKeyDraft] = useState('')
     const [apiKeySaveStatus, setApiKeySaveStatus] =
         useState<ApiKeySaveStatus>('idle')
     const [storeReady, setStoreReady] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [content, setContent] = useState('')
     const [isNarrow, setIsNarrow] = useState(
         () => window.innerWidth < SIDEBAR_BREAKPOINT
     )
@@ -41,6 +73,7 @@ function App() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
     const storeRef = useRef<EssayStore>()
+    const editorRef = useRef<MarkdownEditorHandle>(null)
     const apiKeyDraftRef = useRef('')
     const accessTokenRef = useRef('')
     const apiKeySaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -51,17 +84,9 @@ function App() {
         ? mobileSidebarOpen
         : desktopSidebarVisible
 
-    const restoreBackup = () => {
-        const backup = localStorage.getItem('backup')
-        if (backup) {
-            const {content, timestamp} = JSON.parse(backup)
-            setContent(content)
-            setBackTimestamp(timestamp)
-        }
-    }
-
     const backup = useCallback(
-        debounce((content: string) => {
+        debounce(() => {
+            const content = editorRef.current?.getValue() ?? ''
             if (content !== '') {
                 const timestamp = Date.now()
                 localStorage.setItem(
@@ -173,7 +198,6 @@ function App() {
         }
 
         void initializeStore()
-        restoreBackup()
 
         return () => {
             cancelled = true
@@ -222,12 +246,11 @@ function App() {
         const saved = await flushApiKeySave()
         if (saved) {
             setPage('editor')
+            requestAnimationFrame(() => {
+                editorRef.current?.requestMeasure()
+                editorRef.current?.focus()
+            })
         }
-    }
-
-    const onInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
-        setContent(event.target.value)
-        backup(event.target.value)
     }
 
     const onSubmit = async () => {
@@ -243,6 +266,7 @@ function App() {
 
         setLoading(true)
         try {
+            const content = editorRef.current?.getValue() ?? ''
             const resp = await fetch('https://api.essay.ink/essays', {
                 method: 'POST',
                 headers: {
@@ -256,7 +280,7 @@ function App() {
             if (resp.ok) {
                 localStorage.removeItem('backup')
                 const {id} = await resp.json()
-                setContent('')
+                editorRef.current?.setValue('')
                 setBackTimestamp(0)
                 toast({
                     title: '文章已发布',
@@ -367,42 +391,50 @@ function App() {
                 </div>
 
                 <div className="main-page-container">
-                    {page === 'editor' ? (
-                        <div className="editor-page">
-                            <textarea
-                                placeholder="从这里开始..."
-                                disabled={loading}
-                                className="editor-textarea"
-                                value={content}
-                                onChange={onInput}
-                            />
-                            <footer className="editor-footer">
-                                <div>
-                                    {backTimestamp !== 0 && (
-                                        <span className="backup-status">
-                                            last saved{' '}
-                                            {getRelativeTime(new Date(backTimestamp))}
-                                        </span>
-                                    )}
-                                </div>
-                                <Button
-                                    type="button"
-                                    size="icon"
-                                    className="publish-button"
-                                    aria-label="发布文章"
-                                    title="发布"
-                                    disabled={loading || !storeReady}
-                                    onClick={onSubmit}
-                                >
-                                    {loading ? (
-                                        <ShadowInnerIcon className="animate-spin" />
-                                    ) : (
-                                        <PaperPlaneIcon />
-                                    )}
-                                </Button>
-                            </footer>
-                        </div>
-                    ) : (
+                    <div
+                        className={`editor-page ${
+                            page === 'editor' ? '' : 'is-page-hidden'
+                        }`}
+                        aria-hidden={page !== 'editor'}
+                    >
+                        <MarkdownEditor
+                            ref={editorRef}
+                            initialValue={initialBackup.content}
+                            disabled={loading}
+                            onDirty={backup}
+                        />
+                        <footer className="editor-footer">
+                            <div>
+                                {backTimestamp !== 0 && (
+                                    <span className="backup-status">
+                                        last saved{' '}
+                                        {getRelativeTime(new Date(backTimestamp))}
+                                    </span>
+                                )}
+                            </div>
+                            <Button
+                                type="button"
+                                size="icon"
+                                className="publish-button"
+                                aria-label="发布文章"
+                                title="发布"
+                                disabled={loading || !storeReady}
+                                onClick={onSubmit}
+                            >
+                                {loading ? (
+                                    <ShadowInnerIcon className="animate-spin" />
+                                ) : (
+                                    <PaperPlaneIcon />
+                                )}
+                            </Button>
+                        </footer>
+                    </div>
+                    <div
+                        className={`settings-page-container ${
+                            page === 'settings' ? '' : 'is-page-hidden'
+                        }`}
+                        aria-hidden={page !== 'settings'}
+                    >
                         <SettingsPage
                             value={apiKeyDraft}
                             saveStatus={apiKeySaveStatus}
@@ -411,7 +443,7 @@ function App() {
                             onBlur={() => void flushApiKeySave()}
                             onBack={returnToEditor}
                         />
-                    )}
+                    </div>
                 </div>
             </main>
         </div>
