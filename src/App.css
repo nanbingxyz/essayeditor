@@ -26,6 +26,7 @@
         --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 0 0% 98%;
         --border: 240, 0%, 79%;
+        --border-secondary: 240 0% 95%;
         --input: 0 0% 84%;
         --ring: 0 0% 3.9%;
         --chart-1: 12 76% 61%;
@@ -58,6 +59,7 @@
             --destructive: 0 62.8% 30.6%;
             --destructive-foreground: 0 0% 98%;
             --border: 0 0% 15%;
+            --border-secondary: 0 0% 20%;
             --input: 0 0% 20%;
             --ring: 0 0% 83.1%;
             --chart-1: 220 70% 50%;
@@ -89,6 +91,7 @@
         --destructive: 0 62.8% 30.6%;
         --destructive-foreground: 0 0% 98%;
         --border: 0 0% 15%;
+        --border-secondary: 0 0% 20%;
         --input: 0 0% 20%;
         --ring: 0 0% 83.1%;
         --chart-1: 220 70% 50%;
@@ -171,10 +174,6 @@ textarea {
     padding: 6px 12px;
 }
 
-html[data-platform='macos'] {
-    --macos-titlebar-toggle-offset-y: -7px;
-}
-
 html[data-platform='macos'] .app-shell {
     background: transparent;
 }
@@ -195,15 +194,44 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     color: hsl(var(--muted-foreground));
 }
 
-/* Align the 23px web control center with the AppKit overlay traffic lights. */
-html[data-platform='macos'] .sidebar-titlebar > .sidebar-toggle,
-html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
-    transform: translateY(var(--macos-titlebar-toggle-offset-y));
-}
-
 .sidebar-toggle svg {
     width: 17px;
     height: 17px;
+}
+
+.right-sidebar-toggle {
+    margin-left: auto;
+}
+
+.editor-toolbar {
+    gap: 8px;
+    border-bottom: 1px solid hsl(var(--border-secondary));
+    background: hsl(var(--main-background));
+}
+
+.editor-toolbar-title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    padding: 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.editor-toolbar-title svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    color: hsl(var(--muted-foreground));
+    stroke-width: 1.5;
+}
+
+.editor-toolbar-title span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .sidebar-list-region {
@@ -439,6 +467,67 @@ html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
     flex: 1;
     flex-direction: column;
     background: hsl(var(--main-background));
+}
+
+.app-right-sidebar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    width: var(--right-sidebar-width);
+    min-width: var(--right-sidebar-width);
+    flex: 0 0 var(--right-sidebar-width);
+    flex-direction: column;
+    background: hsl(var(--main-background));
+    border-left: 1px solid hsl(var(--border-secondary));
+}
+
+.right-sidebar-titlebar {
+    width: 100%;
+    border-bottom: 1px solid hsl(var(--border-secondary));
+}
+
+.right-sidebar-content {
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+}
+
+.right-sidebar-resizer {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    left: -5px;
+    width: 10px;
+    touch-action: none;
+    cursor: col-resize;
+}
+
+.right-sidebar-resizer::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    background: transparent;
+    content: '';
+    transition: background-color 120ms ease;
+}
+
+.right-sidebar-resizer:hover::after,
+.right-sidebar-resizer:focus-visible::after,
+.is-resizing-right-sidebar .right-sidebar-resizer::after {
+    background: hsl(var(--ring));
+}
+
+.right-sidebar-resizer:focus-visible {
+    outline: 0;
+}
+
+.is-resizing-right-sidebar,
+.is-resizing-right-sidebar * {
+    cursor: col-resize !important;
+    user-select: none !important;
 }
 
 .main-titlebar {

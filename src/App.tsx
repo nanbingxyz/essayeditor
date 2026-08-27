@@ -8,8 +8,23 @@ import {fetch} from '@tauri-apps/plugin-http'
 import {open} from '@tauri-apps/plugin-shell'
 import {getCurrentWindow} from '@tauri-apps/api/window'
 import {GearIcon, PaperPlaneIcon, ShadowInnerIcon} from '@radix-ui/react-icons'
-import {CircleUserRound, PanelLeftClose, PanelLeftOpen} from 'lucide-react'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {
+    CircleUserRound,
+    FileText,
+    PanelLeftClose,
+    PanelLeftOpen,
+    PanelRightClose,
+    PanelRightOpen,
+} from 'lucide-react'
+import {
+    type CSSProperties,
+    type KeyboardEvent,
+    type PointerEvent as ReactPointerEvent,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+} from 'react'
 
 import MarkdownEditor, {
     MarkdownEditorHandle,
@@ -27,13 +42,29 @@ import {debounce, getRelativeTime} from './utils'
 
 type AppPage = 'editor' | 'settings'
 
-const SIDEBAR_BREAKPOINT = 500
+const LEFT_SIDEBAR_WIDTH = 240
+const MIN_EDITOR_WIDTH = 480
+const SIDEBAR_BREAKPOINT = LEFT_SIDEBAR_WIDTH + MIN_EDITOR_WIDTH
+const DEFAULT_RIGHT_SIDEBAR_WIDTH = 300
+const MIN_RIGHT_SIDEBAR_WIDTH = 240
+const MAX_RIGHT_SIDEBAR_WIDTH = 600
+const RIGHT_SIDEBAR_RESIZE_STEP = 16
 const API_KEY_SAVE_DELAY = 400
 const EMPTY_ARTICLE_COUNTS: ArticleCountByDate = {}
 
 interface LocalBackup {
     content: string
     timestamp: number
+}
+
+interface RightSidebarResizeStart {
+    pointerId: number
+    pointerX: number
+    width: number
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+    return Math.min(Math.max(value, minimum), maximum)
 }
 
 function readBackup(): LocalBackup {
@@ -87,8 +118,16 @@ function App() {
     const [isNarrow, setIsNarrow] = useState(
         () => window.innerWidth < SIDEBAR_BREAKPOINT
     )
+    const [windowWidth, setWindowWidth] = useState(() => window.innerWidth)
     const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(true)
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+    const [desktopRightSidebarVisible, setDesktopRightSidebarVisible] =
+        useState(true)
+    const [rightSidebarWidth, setRightSidebarWidth] = useState(
+        DEFAULT_RIGHT_SIDEBAR_WIDTH
+    )
+    const [isResizingRightSidebar, setIsResizingRightSidebar] =
+        useState(false)
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
     const storeRef = useRef<EssayStore>()
@@ -98,10 +137,33 @@ function App() {
     const apiKeySaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const apiKeySaveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true))
     const apiKeySaveGenerationRef = useRef(0)
+    const rightSidebarResizeStartRef = useRef<RightSidebarResizeStart>()
 
     const sidebarVisible = isNarrow
         ? mobileSidebarOpen
         : desktopSidebarVisible
+    const leftSidebarOccupiedWidth =
+        !isNarrow && desktopSidebarVisible ? LEFT_SIDEBAR_WIDTH : 0
+    const availableRightSidebarWidth = Math.min(
+        MAX_RIGHT_SIDEBAR_WIDTH,
+        windowWidth - leftSidebarOccupiedWidth - MIN_EDITOR_WIDTH
+    )
+    const rightSidebarAvailable =
+        page === 'editor' &&
+        !isNarrow &&
+        availableRightSidebarWidth >= MIN_RIGHT_SIDEBAR_WIDTH
+    const rightSidebarVisible =
+        rightSidebarAvailable && desktopRightSidebarVisible
+    const effectiveRightSidebarWidth = rightSidebarAvailable
+        ? clamp(
+              rightSidebarWidth,
+              MIN_RIGHT_SIDEBAR_WIDTH,
+              availableRightSidebarWidth
+          )
+        : 0
+    const rightSidebarStyle = {
+        '--right-sidebar-width': `${effectiveRightSidebarWidth}px`,
+    } as CSSProperties
 
     const backup = useCallback(
         debounce(() => {
@@ -258,7 +320,9 @@ function App() {
 
     useEffect(() => {
         const handleResize = () => {
-            const nextIsNarrow = window.innerWidth < SIDEBAR_BREAKPOINT
+            const nextWindowWidth = window.innerWidth
+            const nextIsNarrow = nextWindowWidth < SIDEBAR_BREAKPOINT
+            setWindowWidth(nextWindowWidth)
             setIsNarrow((currentIsNarrow) => {
                 if (currentIsNarrow !== nextIsNarrow) {
                     setMobileSidebarOpen(false)
@@ -270,6 +334,14 @@ function App() {
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)
     }, [])
+
+    useEffect(() => {
+        const animationFrame = requestAnimationFrame(() => {
+            editorRef.current?.requestMeasure()
+        })
+
+        return () => cancelAnimationFrame(animationFrame)
+    }, [sidebarVisible, rightSidebarVisible, effectiveRightSidebarWidth])
 
     useEffect(() => {
         return () => {
@@ -285,6 +357,76 @@ function App() {
         } else {
             setDesktopSidebarVisible((visible) => !visible)
         }
+    }
+
+    const toggleRightSidebar = () => {
+        setDesktopRightSidebarVisible((visible) => !visible)
+    }
+
+    const stopRightSidebarResize = (pointerId?: number) => {
+        if (
+            pointerId !== undefined &&
+            rightSidebarResizeStartRef.current?.pointerId !== pointerId
+        ) {
+            return
+        }
+
+        rightSidebarResizeStartRef.current = undefined
+        setIsResizingRightSidebar(false)
+        editorRef.current?.requestMeasure()
+    }
+
+    const startRightSidebarResize = (
+        event: ReactPointerEvent<HTMLDivElement>
+    ) => {
+        if (event.button !== 0) {
+            return
+        }
+
+        event.preventDefault()
+        event.currentTarget.setPointerCapture(event.pointerId)
+        rightSidebarResizeStartRef.current = {
+            pointerId: event.pointerId,
+            pointerX: event.clientX,
+            width: effectiveRightSidebarWidth,
+        }
+        setIsResizingRightSidebar(true)
+    }
+
+    const resizeRightSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
+        const resizeStart = rightSidebarResizeStartRef.current
+        if (!resizeStart || resizeStart.pointerId !== event.pointerId) {
+            return
+        }
+
+        const nextWidth =
+            resizeStart.width + resizeStart.pointerX - event.clientX
+        setRightSidebarWidth(
+            clamp(
+                nextWidth,
+                MIN_RIGHT_SIDEBAR_WIDTH,
+                availableRightSidebarWidth
+            )
+        )
+    }
+
+    const resizeRightSidebarWithKeyboard = (
+        event: KeyboardEvent<HTMLDivElement>
+    ) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+            return
+        }
+
+        event.preventDefault()
+        const direction = event.key === 'ArrowLeft' ? 1 : -1
+        setRightSidebarWidth(
+            clamp(
+                effectiveRightSidebarWidth +
+                    direction * RIGHT_SIDEBAR_RESIZE_STEP,
+                MIN_RIGHT_SIDEBAR_WIDTH,
+                availableRightSidebarWidth
+            )
+        )
     }
 
     const openSettings = () => {
@@ -365,6 +507,12 @@ function App() {
         <div
             className={`app-shell ${isNarrow ? 'is-narrow' : 'is-wide'} ${
                 sidebarVisible ? 'sidebar-is-visible' : 'sidebar-is-hidden'
+            } ${
+                rightSidebarVisible
+                    ? 'right-sidebar-is-visible'
+                    : 'right-sidebar-is-hidden'
+            } ${
+                isResizingRightSidebar ? 'is-resizing-right-sidebar' : ''
             }`}
         >
             {isNarrow && mobileSidebarOpen && (
@@ -381,7 +529,7 @@ function App() {
                 <div data-tauri-drag-region className="titlebar-surface sidebar-titlebar">
                     <button
                         type="button"
-                        className="sidebar-toggle ml-2"
+                        className="sidebar-toggle ml-2 -mt-0.5"
                         aria-label="收起侧边栏"
                         title="收起侧边栏"
                         tabIndex={sidebarVisible ? 0 : -1}
@@ -434,7 +582,13 @@ function App() {
             </aside>
 
             <main className="app-main">
-                <div data-tauri-drag-region className="titlebar-surface main-titlebar">
+                <div
+                    data-tauri-drag-region
+                    className={`titlebar-surface main-titlebar ${
+                        page === 'editor' ? 'editor-toolbar' : ''
+                    }`}
+                    aria-label={page === 'editor' ? '编辑器工具栏' : undefined}
+                >
                     {!sidebarVisible && (
                         <button
                             type="button"
@@ -444,6 +598,45 @@ function App() {
                             onClick={toggleSidebar}
                         >
                             <PanelLeftOpen aria-hidden="true" style={{ strokeWidth: 1 }} />
+                        </button>
+                    )}
+                    {page === 'editor' && (
+                        <div
+                            data-tauri-drag-region
+                            className="editor-toolbar-title"
+                        >
+                            <FileText aria-hidden="true" />
+                            <span>新文章</span>
+                        </div>
+                    )}
+                    {rightSidebarAvailable && (
+                        <button
+                            type="button"
+                            className="sidebar-toggle right-sidebar-toggle"
+                            aria-label={
+                                rightSidebarVisible
+                                    ? '收起私人笔记侧边栏'
+                                    : '显示私人笔记侧边栏'
+                            }
+                            aria-expanded={rightSidebarVisible}
+                            title={
+                                rightSidebarVisible
+                                    ? '收起私人笔记侧边栏'
+                                    : '显示私人笔记侧边栏'
+                            }
+                            onClick={toggleRightSidebar}
+                        >
+                            {rightSidebarVisible ? (
+                                <PanelRightClose
+                                    aria-hidden="true"
+                                    style={{ strokeWidth: 1 }}
+                                />
+                            ) : (
+                                <PanelRightOpen
+                                    aria-hidden="true"
+                                    style={{ strokeWidth: 1 }}
+                                />
+                            )}
                         </button>
                     )}
                 </div>
@@ -506,6 +699,40 @@ function App() {
                     </div>
                 </div>
             </main>
+
+            {rightSidebarVisible && (
+                <aside
+                    className="app-right-sidebar"
+                    style={rightSidebarStyle}
+                    aria-label="私人笔记侧边栏"
+                >
+                    <div
+                        className="right-sidebar-resizer"
+                        role="separator"
+                        aria-label="调整私人笔记侧边栏宽度"
+                        aria-orientation="vertical"
+                        aria-valuemin={MIN_RIGHT_SIDEBAR_WIDTH}
+                        aria-valuemax={Math.floor(availableRightSidebarWidth)}
+                        aria-valuenow={Math.round(effectiveRightSidebarWidth)}
+                        tabIndex={0}
+                        onKeyDown={resizeRightSidebarWithKeyboard}
+                        onPointerDown={startRightSidebarResize}
+                        onPointerMove={resizeRightSidebar}
+                        onPointerUp={(event) =>
+                            stopRightSidebarResize(event.pointerId)
+                        }
+                        onPointerCancel={(event) =>
+                            stopRightSidebarResize(event.pointerId)
+                        }
+                        onLostPointerCapture={() => stopRightSidebarResize()}
+                    />
+                    <div
+                        data-tauri-drag-region
+                        className="titlebar-surface right-sidebar-titlebar"
+                    />
+                    <div className="right-sidebar-content" />
+                </aside>
+            )}
         </div>
     )
 }
