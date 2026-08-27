@@ -9,13 +9,17 @@ import {open} from '@tauri-apps/plugin-shell'
 import {getCurrentWindow} from '@tauri-apps/api/window'
 import {GearIcon, PaperPlaneIcon, ShadowInnerIcon} from '@radix-ui/react-icons'
 import {
-    CircleUserRound,
-    FileText,
-    PanelLeftClose,
-    PanelLeftOpen,
-    PanelRightClose,
-    PanelRightOpen,
-} from 'lucide-react'
+    PanelLeftContract28Filled,
+    PanelLeftContract28Regular,
+    PanelLeftExpand28Filled,
+    PanelLeftExpand28Regular,
+    PanelRightContract28Filled,
+    PanelRightContract28Regular,
+    PanelRightExpand28Filled,
+    PanelRightExpand28Regular,
+    bundleIcon
+} from '@fluentui/react-icons';
+
 import {
     type CSSProperties,
     type KeyboardEvent,
@@ -39,6 +43,11 @@ import useStore, {type Appearance, EssayStore} from '@/hooks/use-store'
 import {useToast} from '@/hooks/use-toast'
 
 import {debounce, getRelativeTime} from './utils'
+
+const PanelLeftContractIcon = bundleIcon(PanelLeftContract28Filled, PanelLeftContract28Regular)
+const PanelLeftExpandIcon = bundleIcon(PanelLeftExpand28Filled, PanelLeftExpand28Regular)
+const PanelRightContractIcon = bundleIcon(PanelRightContract28Filled, PanelRightContract28Regular)
+const PanelRightExpandIcon = bundleIcon(PanelRightExpand28Filled, PanelRightExpand28Regular)
 
 type AppPage = 'editor' | 'settings'
 
@@ -529,13 +538,13 @@ function App() {
                 <div data-tauri-drag-region className="titlebar-surface sidebar-titlebar">
                     <button
                         type="button"
-                        className="sidebar-toggle ml-2 -mt-0.5"
+                        className="sidebar-toggle ml-1 -mt-1"
                         aria-label="收起侧边栏"
                         title="收起侧边栏"
                         tabIndex={sidebarVisible ? 0 : -1}
                         onClick={toggleSidebar}
                     >
-                        <PanelLeftClose aria-hidden="true" style={{ strokeWidth: 1 }} />
+                        <PanelLeftContractIcon aria-hidden="true"/>
                     </button>
                 </div>
 
@@ -553,7 +562,7 @@ function App() {
                             <div className="sidebar-account-skeleton" aria-label="正在读取本地设置" />
                         ) : accessToken ? (
                             <div className="sidebar-user" aria-label="当前用户：Essay 用户">
-                                <CircleUserRound aria-hidden="true" />
+                               
                                 <span>Essay 用户</span>
                             </div>
                         ) : (
@@ -592,12 +601,12 @@ function App() {
                     {!sidebarVisible && (
                         <button
                             type="button"
-                            className="sidebar-toggle ml-2"
+                            className="sidebar-toggle ml-2 -mt-1"
                             aria-label="显示侧边栏"
                             title="显示侧边栏"
                             onClick={toggleSidebar}
                         >
-                            <PanelLeftOpen aria-hidden="true" style={{ strokeWidth: 1 }} />
+                            <PanelLeftExpandIcon aria-hidden="true"/>
                         </button>
                     )}
                     {page === 'editor' && (
@@ -605,7 +614,6 @@ function App() {
                             data-tauri-drag-region
                             className="editor-toolbar-title"
                         >
-                            <FileText aria-hidden="true" />
                             <span>新文章</span>
                         </div>
                     )}
@@ -627,12 +635,12 @@ function App() {
                             onClick={toggleRightSidebar}
                         >
                             {rightSidebarVisible ? (
-                                <PanelRightClose
+                                <PanelRightContractIcon
                                     aria-hidden="true"
                                     style={{ strokeWidth: 1 }}
                                 />
                             ) : (
-                                <PanelRightOpen
+                                <PanelRightExpandIcon
                                     aria-hidden="true"
                                     style={{ strokeWidth: 1 }}
                                 />

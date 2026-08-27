@@ -1,4 +1,5 @@
-import {ChevronLeft, ChevronRight} from 'lucide-react'
+import {    ChevronLeftRegular,
+    ChevronRightRegular,} from '@fluentui/react-icons'
 import {useState} from 'react'
 
 export type ArticleCountByDate = Record<string, number>
@@ -150,7 +151,7 @@ function SidebarCalendar({
                     title={previousLabel}
                     onClick={navigateBackward}
                 >
-                    <ChevronLeft aria-hidden="true" />
+                    <ChevronLeftRegular aria-hidden="true" />
                 </button>
                 <button
                     type="button"
@@ -172,7 +173,7 @@ function SidebarCalendar({
                     title={nextLabel}
                     onClick={navigateForward}
                 >
-                    <ChevronRight aria-hidden="true" />
+                    <ChevronRightRegular aria-hidden="true" />
                 </button>
             </header>
 
