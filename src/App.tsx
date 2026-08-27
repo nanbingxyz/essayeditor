@@ -6,6 +6,7 @@ import '@fontsource/barlow/latin-700.css'
 import '@fontsource-variable/noto-serif-sc'
 import {fetch} from '@tauri-apps/plugin-http'
 import {open} from '@tauri-apps/plugin-shell'
+import {getCurrentWindow} from '@tauri-apps/api/window'
 import {GearIcon, PaperPlaneIcon, ShadowInnerIcon} from '@radix-ui/react-icons'
 import {CircleUserRound, PanelLeftClose, PanelLeftOpen} from 'lucide-react'
 import {useCallback, useEffect, useRef, useState} from 'react'
@@ -14,9 +15,12 @@ import MarkdownEditor, {
     MarkdownEditorHandle,
 } from '@/components/markdown-editor'
 import SettingsPage, {ApiKeySaveStatus} from '@/components/settings-page'
+import SidebarCalendar, {
+    type ArticleCountByDate,
+} from '@/components/sidebar-calendar'
 import {Button} from '@/components/ui/button'
 import {ToastAction} from '@/components/ui/toast'
-import useStore, {EssayStore} from '@/hooks/use-store'
+import useStore, {type Appearance, EssayStore} from '@/hooks/use-store'
 import {useToast} from '@/hooks/use-toast'
 
 import {debounce, getRelativeTime} from './utils'
@@ -25,6 +29,7 @@ type AppPage = 'editor' | 'settings'
 
 const SIDEBAR_BREAKPOINT = 500
 const API_KEY_SAVE_DELAY = 400
+const EMPTY_ARTICLE_COUNTS: ArticleCountByDate = {}
 
 interface LocalBackup {
     content: string
@@ -53,6 +58,18 @@ function readBackup(): LocalBackup {
     }
 }
 
+function applyAppearance(appearance: Appearance) {
+    if (appearance === 'system') {
+        delete document.documentElement.dataset.theme
+    } else {
+        document.documentElement.dataset.theme = appearance
+    }
+
+    void getCurrentWindow()
+        .setTheme(appearance === 'system' ? null : appearance)
+        .catch(() => undefined)
+}
+
 function App() {
     const {toast} = useToast()
     const [initialBackup] = useState(readBackup)
@@ -62,6 +79,7 @@ function App() {
     )
     const [accessToken, setAccessToken] = useState('')
     const [apiKeyDraft, setApiKeyDraft] = useState('')
+    const [appearance, setAppearance] = useState<Appearance>('system')
     const [apiKeySaveStatus, setApiKeySaveStatus] =
         useState<ApiKeySaveStatus>('idle')
     const [storeReady, setStoreReady] = useState(false)
@@ -71,6 +89,7 @@ function App() {
     )
     const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(true)
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+    const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
     const storeRef = useRef<EssayStore>()
     const editorRef = useRef<MarkdownEditorHandle>(null)
@@ -134,6 +153,27 @@ function App() {
         return saveTask
     }, [])
 
+    const changeAppearance = useCallback(
+        (nextAppearance: Appearance) => {
+            setAppearance(nextAppearance)
+            applyAppearance(nextAppearance)
+
+            const store = storeRef.current
+            if (!store) {
+                return
+            }
+
+            void store.saveAppearance(nextAppearance).catch(() => {
+                toast({
+                    title: '无法保存外观设置',
+                    description: '本次选择会在当前运行期间保持生效',
+                    variant: 'destructive',
+                })
+            })
+        },
+        [toast]
+    )
+
     const flushApiKeySave = useCallback(async () => {
         if (apiKeySaveTimerRef.current) {
             clearTimeout(apiKeySaveTimerRef.current)
@@ -173,14 +213,20 @@ function App() {
                     return
                 }
                 storeRef.current = store
-                const storedAccessToken = (await store.getAccessToken()).trim()
+                const [storedAccessToken, storedAppearance] = await Promise.all([
+                    store.getAccessToken(),
+                    store.getAppearance(),
+                ])
                 if (cancelled) {
                     return
                 }
-                accessTokenRef.current = storedAccessToken
-                apiKeyDraftRef.current = storedAccessToken
-                setAccessToken(storedAccessToken)
-                setApiKeyDraft(storedAccessToken)
+                const normalizedAccessToken = storedAccessToken.trim()
+                accessTokenRef.current = normalizedAccessToken
+                apiKeyDraftRef.current = normalizedAccessToken
+                setAccessToken(normalizedAccessToken)
+                setApiKeyDraft(normalizedAccessToken)
+                setAppearance(storedAppearance)
+                applyAppearance(storedAppearance)
             } catch {
                 if (!cancelled) {
                     setApiKeySaveStatus('error')
@@ -339,7 +385,13 @@ function App() {
                     </button>
                 </div>
 
-                <div className="sidebar-spacer" />
+                <SidebarCalendar
+                    articleCounts={EMPTY_ARTICLE_COUNTS}
+                    selectedDate={selectedDate}
+                    onDateSelect={setSelectedDate}
+                />
+
+                <div className="sidebar-list-region" />
 
                 <footer className="sidebar-footer">
                     <div className="sidebar-account-slot">
@@ -441,6 +493,8 @@ function App() {
                             disabled={!storeReady}
                             onChange={scheduleApiKeySave}
                             onBlur={() => void flushApiKeySave()}
+                            appearance={appearance}
+                            onAppearanceChange={changeAppearance}
                             onBack={returnToEditor}
                         />
                     </div>

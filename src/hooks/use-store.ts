@@ -1,9 +1,12 @@
 import {load} from '@tauri-apps/plugin-store'
 
+export type Appearance = 'light' | 'dark' | 'system'
 
 export interface EssayStore{
     saveAccessToken: (accessToken: string) => Promise<void>
     getAccessToken: () => Promise<string>
+    saveAppearance: (appearance: Appearance) => Promise<void>
+    getAppearance: () => Promise<Appearance>
 }
 
 export default async function useStore():Promise<EssayStore> {
@@ -20,5 +23,17 @@ export default async function useStore():Promise<EssayStore> {
         return accessToken || ''
     }
 
-    return {saveAccessToken, getAccessToken}
+    const saveAppearance = async (appearance: Appearance) => {
+        await store.set('appearance', appearance)
+        await store.save()
+    }
+
+    const getAppearance = async ():Promise<Appearance> => {
+        const appearance = await store.get('appearance')
+        return appearance === 'light' || appearance === 'dark'
+            ? appearance
+            : 'system'
+    }
+
+    return {saveAccessToken, getAccessToken, saveAppearance, getAppearance}
 }

@@ -5,6 +5,7 @@ import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {cn} from '@/lib/utils'
+import type {Appearance} from '@/hooks/use-store'
 
 export type ApiKeySaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -14,6 +15,8 @@ interface SettingsPageProps {
     disabled: boolean
     onChange: (value: string) => void
     onBlur: () => void
+    appearance: Appearance
+    onAppearanceChange: (appearance: Appearance) => void
     onBack: () => void | Promise<void>
 }
 
@@ -30,6 +33,8 @@ export default function SettingsPage({
     disabled,
     onChange,
     onBlur,
+    appearance,
+    onAppearanceChange,
     onBack,
 }: SettingsPageProps) {
     const [showApiKey, setShowApiKey] = useState(false)
@@ -99,6 +104,44 @@ export default function SettingsPage({
                 >
                     {saveStatusCopy[saveStatus]}
                 </p>
+            </section>
+
+            <section className="settings-section appearance-section" aria-labelledby="appearance-heading">
+                <div className="settings-section-copy">
+                    <h2 id="appearance-heading">外观</h2>
+                    <p>选择应用和窗口标题栏的显示方式。</p>
+                </div>
+
+                <div className="appearance-options" role="radiogroup" aria-labelledby="appearance-heading">
+                    {(
+                        [
+                            ['light', '浅色', '始终使用浅色外观'],
+                            ['dark', '暗色', '始终使用暗色外观'],
+                            ['system', '跟随系统', '根据系统设置自动切换'],
+                        ] as const
+                    ).map(([option, label, description]) => (
+                        <label
+                            key={option}
+                            className={cn(
+                                'appearance-option',
+                                appearance === option && 'is-selected'
+                            )}
+                        >
+                            <input
+                                type="radio"
+                                name="appearance"
+                                value={option}
+                                checked={appearance === option}
+                                disabled={disabled}
+                                onChange={() => onAppearanceChange(option)}
+                            />
+                            <span className="appearance-option-copy">
+                                <span>{label}</span>
+                                <small>{description}</small>
+                            </span>
+                        </label>
+                    ))}
+                </div>
             </section>
         </div>
     )

@@ -8,6 +8,7 @@
     }
 
     :root {
+        color-scheme: light;
         --background: 50 18% 92%;
         --foreground: 0 0% 3.9%;
         --card: 50 18% 95%;
@@ -38,7 +39,8 @@
     }
 
     @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme='light']) {
+            color-scheme: dark;
             --background: 0 0% 3.9%;
             --foreground: 0 0% 98%;
             --card: 0 0% 6.5%;
@@ -66,6 +68,36 @@
             --sidebar-background: 0 0% 5.5%;
             --main-background: 0 0% 7.5%;
         }
+    }
+
+    :root[data-theme='dark'] {
+        color-scheme: dark;
+        --background: 0 0% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 0 0% 6.5%;
+        --card-foreground: 0 0% 98%;
+        --popover: 0 0% 3.9%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 0 0% 98%;
+        --primary-foreground: 0 0% 9%;
+        --secondary: 0 0% 14.9%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 0 0% 14.9%;
+        --muted-foreground: 0 0% 63.9%;
+        --accent: 0 0% 14.9%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 0 0% 15%;
+        --input: 0 0% 20%;
+        --ring: 0 0% 83.1%;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+        --sidebar-background: 0 0% 5.5%;
+        --main-background: 0 0% 7.5%;
     }
 }
 
@@ -160,8 +192,169 @@ html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
     height: 17px;
 }
 
-.sidebar-spacer {
+.sidebar-list-region {
+    min-height: 0;
     flex: 1;
+    overflow-y: auto;
+}
+
+.sidebar-calendar {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    padding: 4px 12px 14px;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.calendar-header {
+    display: grid;
+    height: 34px;
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.calendar-navigation-button,
+.calendar-title-button,
+.calendar-day,
+.calendar-picker-button {
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+}
+
+.calendar-navigation-button,
+.calendar-title-button,
+.calendar-day,
+.calendar-picker-button {
+    transition: color 140ms ease, background-color 140ms ease,
+        box-shadow 140ms ease;
+}
+
+.calendar-navigation-button:focus-visible,
+.calendar-title-button:focus-visible,
+.calendar-day:focus-visible,
+.calendar-picker-button:focus-visible {
+    outline: 1px solid hsl(var(--ring));
+    outline-offset: 1px;
+}
+
+.calendar-navigation-button {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: hsl(var(--muted-foreground));
+}
+
+.calendar-navigation-button:hover,
+.calendar-title-button:hover,
+.calendar-picker-button:hover {
+    color: hsl(var(--accent-foreground));
+    background: hsl(var(--accent) / 0.72);
+}
+
+.calendar-navigation-button svg {
+    width: 15px;
+    height: 15px;
+    stroke-width: 1.5;
+}
+
+.calendar-title-button {
+    min-width: 0;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.calendar-body {
+    height: 184px;
+}
+
+.calendar-weekdays,
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-weekdays {
+    height: 22px;
+    align-items: center;
+    color: hsl(var(--muted-foreground));
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.calendar-days {
+    grid-auto-rows: 27px;
+}
+
+.calendar-day {
+    position: relative;
+    width: 26px;
+    height: 26px;
+    place-self: center;
+    border-radius: 50%;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.calendar-day:hover {
+    background: hsl(var(--accent) / 0.82);
+}
+
+.calendar-day.is-outside-month {
+    color: hsl(var(--muted-foreground) / 0.45);
+}
+
+.calendar-day.is-today:not(.is-selected)::after {
+    position: absolute;
+    right: 50%;
+    bottom: 2px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    content: '';
+    transform: translateX(50%);
+}
+
+.calendar-day.is-selected {
+    color: hsl(var(--primary-foreground));
+    background: hsl(var(--primary));
+}
+
+.calendar-day.is-selected:hover {
+    background: hsl(var(--primary) / 0.88);
+}
+
+.calendar-picker-grid {
+    display: grid;
+    height: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    padding: 4px 0 2px;
+}
+
+.calendar-picker-button {
+    border-radius: 6px;
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.calendar-picker-button.is-current-value {
+    color: hsl(var(--foreground));
+    background: hsl(var(--accent));
+    font-weight: 600;
 }
 
 .sidebar-footer {
@@ -503,6 +696,80 @@ html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
     font-weight: 650;
 }
 
+.settings-section-copy h2 {
+    margin: 0 0 5px;
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 1.4;
+}
+
+.appearance-section {
+    margin-top: 38px;
+}
+
+.appearance-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.appearance-option {
+    display: flex;
+    min-height: 96px;
+    cursor: pointer;
+    flex-direction: column;
+    justify-content: center;
+    padding: 14px;
+    border: 1px solid hsl(var(--input));
+    border-radius: var(--radius);
+    background: hsl(var(--card));
+    transition: border-color 120ms ease, box-shadow 120ms ease,
+        background-color 120ms ease;
+}
+
+.appearance-option:hover {
+    background: hsl(var(--accent) / 0.55);
+}
+
+.appearance-option.is-selected {
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 1px hsl(var(--ring));
+}
+
+.appearance-option:has(input:focus-visible) {
+    outline: 1px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+.appearance-option:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.appearance-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+}
+
+.appearance-option-copy {
+    display: grid;
+    gap: 4px;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.appearance-option-copy small {
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
 .api-key-field {
     display: flex;
     align-items: center;
@@ -589,6 +856,14 @@ html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
 
     .settings-page-header {
         margin-bottom: 34px;
+    }
+
+    .appearance-options {
+        grid-template-columns: 1fr;
+    }
+
+    .appearance-option {
+        min-height: 0;
     }
 }
 
