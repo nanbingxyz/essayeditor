@@ -25,7 +25,7 @@
         --accent-foreground: 0 0% 9%;
         --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 84%;
+        --border: 240, 0%, 79%;
         --input: 0 0% 84%;
         --ring: 0 0% 3.9%;
         --chart-1: 12 76% 61%;
@@ -115,6 +115,12 @@ body,
     overflow: hidden;
 }
 
+html[data-platform='macos'],
+html[data-platform='macos'] body,
+html[data-platform='macos'] #root {
+    background: transparent;
+}
+
 button,
 input,
 textarea {
@@ -167,6 +173,14 @@ textarea {
 
 html[data-platform='macos'] {
     --macos-titlebar-toggle-offset-y: -7px;
+}
+
+html[data-platform='macos'] .app-shell {
+    background: transparent;
+}
+
+html[data-platform='macos'] .app-sidebar {
+    background: transparent;
 }
 
 html[data-platform='macos'] .sidebar-titlebar,
@@ -501,10 +515,10 @@ html[data-platform='macos'] .main-titlebar > .sidebar-toggle {
 }
 
 .markdown-editor .cm-md-heading {
-    min-height: 42px;
+    min-height: 36px;
     padding-top: 8px;
     padding-bottom: 4px;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
     line-height: 36px;
     letter-spacing: -0.015em;
