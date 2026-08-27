@@ -1,3 +1,4 @@
+import {invoke} from '@tauri-apps/api/core'
 import {getCurrentWindow} from '@tauri-apps/api/window'
 import {open} from '@tauri-apps/plugin-shell'
 
@@ -12,6 +13,7 @@ export interface DesktopAdapter {
 export const tauriDesktopAdapter: DesktopAdapter = {
     openExternal: open,
     setWindowAppearance: async (appearance) => {
+        await invoke('set_macos_window_appearance', {appearance})
         await getCurrentWindow().setTheme(
             appearance === 'system' ? null : appearance
         )

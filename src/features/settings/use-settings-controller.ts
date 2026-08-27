@@ -55,7 +55,9 @@ export function useSettingsController({
             applyDocumentAppearance(nextAppearance)
             void desktop
                 .setWindowAppearance(nextAppearance)
-                .catch(() => undefined)
+                .catch((error) => {
+                    console.error('Failed to apply window appearance', error)
+                })
         },
         [desktop]
     )

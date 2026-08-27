@@ -2,6 +2,10 @@ import {createRoot, type Root} from 'react-dom/client'
 import {act} from 'react-dom/test-utils'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 
+vi.mock('@tauri-apps/api/core', () => ({
+    invoke: vi.fn(async () => undefined),
+}))
+
 vi.mock('@tauri-apps/api/window', () => ({
     getCurrentWindow: () => ({
         setTheme: vi.fn(async () => undefined),
