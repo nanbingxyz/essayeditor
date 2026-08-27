@@ -10,7 +10,7 @@ import {
     bundleIcon,
 } from '@fluentui/react-icons'
 import {GearIcon} from '@radix-ui/react-icons'
-import {type CSSProperties, type ReactNode} from 'react'
+import {type CSSProperties, type ReactNode, useState} from 'react'
 
 import {Button} from '@/shared/ui'
 
@@ -40,27 +40,63 @@ const PanelRightExpandIcon = bundleIcon(
 )
 
 interface AppShellProps {
-    accessToken: string
+    accountError: boolean
+    accountLoading: boolean
     articleCounts: ArticleCountByDate
     children: ReactNode
+    hasAccessToken: boolean
     layout: SidebarLayout
     onOpenSettings: () => void
     onSelectedDateChange: (date: string | null) => void
     page: AppPage
     selectedDate: string | null
     storeReady: boolean
+    user: SidebarAccountUser | null
+}
+
+export interface SidebarAccountUser {
+    avatar: string
+    displayName: string
+}
+
+function SidebarUser({user}: {user: SidebarAccountUser}) {
+    const [avatarFailed, setAvatarFailed] = useState(false)
+    const fallbackLabel = user.displayName.trim().charAt(0).toUpperCase() || 'E'
+
+    return (
+        <div
+            className="sidebar-user"
+            aria-label={`当前用户：${user.displayName}`}
+        >
+            <span className="sidebar-user-avatar" aria-hidden="true">
+                {avatarFailed ? (
+                    <span>{fallbackLabel}</span>
+                ) : (
+                    <img
+                        src={user.avatar}
+                        alt=""
+                        onError={() => setAvatarFailed(true)}
+                    />
+                )}
+            </span>
+            <span className="sidebar-user-name">{user.displayName}</span>
+        </div>
+    )
 }
 
 export default function AppShell({
-    accessToken,
+    accountError,
+    accountLoading,
     articleCounts,
     children,
+    hasAccessToken,
     layout,
     onOpenSettings,
     onSelectedDateChange,
     page,
     selectedDate,
     storeReady,
+    user,
 }: AppShellProps) {
     const rightSidebarStyle = {
         '--right-sidebar-width': `${layout.effectiveRightSidebarWidth}px`,
@@ -123,19 +159,18 @@ export default function AppShell({
 
                 <footer className="sidebar-footer">
                     <div className="sidebar-account-slot">
-                        {!storeReady ? (
+                        {!storeReady ||
+                        (hasAccessToken &&
+                            (accountLoading || (!user && !accountError))) ? (
                             <div
                                 className="sidebar-account-skeleton"
-                                aria-label="正在读取本地设置"
+                                aria-label={
+                                    storeReady
+                                        ? '正在读取用户信息'
+                                        : '正在读取本地设置'
+                                }
                             />
-                        ) : accessToken ? (
-                            <div
-                                className="sidebar-user"
-                                aria-label="当前用户：Essay 用户"
-                            >
-                                <span>Essay 用户</span>
-                            </div>
-                        ) : (
+                        ) : !hasAccessToken ? (
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -144,6 +179,12 @@ export default function AppShell({
                             >
                                 设置 API Key
                             </Button>
+                        ) : user ? (
+                            <SidebarUser key={user.avatar} user={user} />
+                        ) : (
+                            <span className="sidebar-account-error">
+                                无法加载用户信息
+                            </span>
                         )}
                     </div>
                     <Button

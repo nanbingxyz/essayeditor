@@ -23,6 +23,28 @@ type CalendarView = 'days' | 'years' | 'months'
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 const MONTHS = Array.from({length: 12}, (_, index) => index + 1)
 
+export const colorScale = [
+    'heat-map-level-0',
+    'heat-map-level-1',
+    'heat-map-level-2',
+    'heat-map-level-3',
+    'heat-map-level-4',
+]
+
+export function getHeatMapColor(value: number) {
+    const thresholds = [0, 1, 2, 5, 7]
+
+    let colorIndex = 0
+    for (let index = 0; index < thresholds.length; index += 1) {
+        if (value >= thresholds[index]) {
+            colorIndex = index
+        } else {
+            break
+        }
+    }
+    return colorScale[colorIndex]
+}
+
 function padDatePart(value: number) {
     return String(value).padStart(2, '0')
 }
@@ -198,6 +220,10 @@ function SidebarCalendar({
                                     articleCount > 0
                                         ? `${articleCount}篇文章`
                                         : '没有文章'
+                                const heatMapColor =
+                                    articleCount > 0
+                                        ? getHeatMapColor(articleCount)
+                                        : ''
 
                                 return (
                                     <button
@@ -209,7 +235,7 @@ function SidebarCalendar({
                                                 : 'is-outside-month'
                                         } ${isToday ? 'is-today' : ''} ${
                                             isSelected ? 'is-selected' : ''
-                                        }`}
+                                        } ${heatMapColor}`}
                                         data-date={day.key}
                                         data-article-count={articleCount}
                                         aria-label={`${day.date.getFullYear()}年${

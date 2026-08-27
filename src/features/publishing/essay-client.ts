@@ -3,8 +3,6 @@ import {
     type HttpClient,
 } from '@/shared/platform/http'
 
-const ESSAY_API_URL = 'https://api.essay.ink/essays'
-
 export class EssayPublishError extends Error {
     constructor(message: string) {
         super(message)
@@ -14,6 +12,11 @@ export class EssayPublishError extends Error {
 
 export interface EssayClient {
     publish: (content: string, accessToken: string) => Promise<{id: string}>
+}
+
+interface EssayClientOptions {
+    baseUrl: string
+    httpClient?: HttpClient
 }
 
 function parseJson(text: string): unknown {
@@ -41,13 +44,18 @@ function readEssayId(payload: unknown) {
 }
 
 export function createEssayClient(
-    httpClient: HttpClient = desktopHttpClient
+    {
+        baseUrl,
+        httpClient = desktopHttpClient,
+    }: EssayClientOptions
 ): EssayClient {
+    const essaysUrl = `${baseUrl.replace(/\/+$/, '')}/essays`
+
     return {
         publish: async (content, accessToken) => {
             let response: Response
             try {
-                response = await httpClient(ESSAY_API_URL, {
+                response = await httpClient(essaysUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

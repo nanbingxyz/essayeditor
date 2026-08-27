@@ -6,6 +6,10 @@ import '@fontsource-variable/noto-serif-sc'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
 import {
+    createEssayActivityClient,
+    useEssayActivityController,
+} from '@/features/activity'
+import {
     createDraftRepository,
     EditorPage,
     type MarkdownEditorHandle,
@@ -14,7 +18,6 @@ import {
 import {
     AppShell,
     type AppPage,
-    type ArticleCountByDate,
     useSidebarLayout,
 } from '@/features/navigation'
 import {
@@ -29,7 +32,7 @@ import {
 import {ToastAction, useToast} from '@/shared/ui'
 import {tauriDesktopAdapter} from '@/shared/platform/desktop'
 
-const EMPTY_ARTICLE_COUNTS: ArticleCountByDate = {}
+import {essayApiBaseUrl} from './essay-api-config'
 
 export default function App() {
     const {toast} = useToast()
@@ -39,7 +42,14 @@ export default function App() {
 
     const settingsRepository = useMemo(createSettingsRepository, [])
     const draftRepository = useMemo(createDraftRepository, [])
-    const essayClient = useMemo(createEssayClient, [])
+    const essayClient = useMemo(
+        () => createEssayClient({baseUrl: essayApiBaseUrl}),
+        []
+    )
+    const essayActivityClient = useMemo(
+        () => createEssayActivityClient({baseUrl: essayApiBaseUrl}),
+        []
+    )
 
     const notifySettingsLoadError = useCallback(() => {
         toast({
@@ -73,6 +83,23 @@ export default function App() {
     const draft = useDraftController({
         repository: draftRepository,
         onError: notifyDraftError,
+    })
+
+    const notifyActivityError = useCallback(
+        (message: string) => {
+            toast({
+                title: '无法同步 Essay 数据',
+                description: message,
+                variant: 'destructive',
+            })
+        },
+        [toast]
+    )
+    const activity = useEssayActivityController({
+        accessToken: settings.accessToken,
+        client: essayActivityClient,
+        enabled: settings.ready,
+        onError: notifyActivityError,
     })
 
     const notifyPublishError = useCallback(
@@ -168,14 +195,17 @@ export default function App() {
 
     return (
         <AppShell
-            accessToken={settings.accessToken}
-            articleCounts={EMPTY_ARTICLE_COUNTS}
+            accountError={activity.error !== null}
+            accountLoading={activity.loading}
+            articleCounts={activity.heatmap}
+            hasAccessToken={Boolean(settings.accessToken)}
             layout={layout}
             onOpenSettings={openSettings}
             onSelectedDateChange={setSelectedDate}
             page={page}
             selectedDate={selectedDate}
             storeReady={settings.ready}
+            user={activity.user}
         >
             <EditorPage
                 ref={editorRef}

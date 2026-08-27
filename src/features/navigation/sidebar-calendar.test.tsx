@@ -6,6 +6,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import SidebarCalendar, {
     type ArticleCountByDate,
     createMonthGrid,
+    getHeatMapColor,
 } from './sidebar-calendar'
 
 const roots: Root[] = []
@@ -71,6 +72,16 @@ describe('calendar date utilities', () => {
         expect(days[41].key).toBe('2024-03-10')
         expect(days.filter((day) => day.isCurrentMonth)).toHaveLength(29)
     })
+
+    it('maps article counts to the expected heatmap thresholds', () => {
+        expect(getHeatMapColor(0)).toBe('heat-map-level-0')
+        expect(getHeatMapColor(1)).toBe('heat-map-level-1')
+        expect(getHeatMapColor(2)).toBe('heat-map-level-2')
+        expect(getHeatMapColor(4)).toBe('heat-map-level-2')
+        expect(getHeatMapColor(5)).toBe('heat-map-level-3')
+        expect(getHeatMapColor(6)).toBe('heat-map-level-3')
+        expect(getHeatMapColor(7)).toBe('heat-map-level-4')
+    })
 })
 
 describe('SidebarCalendar', () => {
@@ -133,21 +144,42 @@ describe('SidebarCalendar', () => {
         expect(selectedDate?.textContent).toBe('')
     })
 
-    it('exposes normalized article counts without applying visual levels', () => {
+    it('normalizes article counts and applies visual levels only above zero', () => {
         const container = renderCalendar({
-            '2026-01-15': 3,
-            '2026-01-16': -2,
+            '2026-01-13': 1,
+            '2026-01-14': 2,
+            '2026-01-15': 5,
+            '2026-01-16': 7,
+            '2026-01-17': -2,
         })
-        const populatedDate = container.querySelector(
-            '[data-date="2026-01-15"]'
-        )
         const emptyDate = container.querySelector(
-            '[data-date="2026-01-16"]'
+            '[data-date="2026-01-17"]'
         )
 
-        expect(populatedDate?.getAttribute('data-article-count')).toBe('3')
-        expect(populatedDate?.getAttribute('aria-label')).toContain('3篇文章')
+        expect(
+            container.querySelector('[data-date="2026-01-13"]')?.className
+        ).toContain('heat-map-level-1')
+        expect(
+            container.querySelector('[data-date="2026-01-14"]')?.className
+        ).toContain('heat-map-level-2')
+        expect(
+            container.querySelector('[data-date="2026-01-15"]')?.className
+        ).toContain('heat-map-level-3')
+        expect(
+            container.querySelector('[data-date="2026-01-16"]')?.className
+        ).toContain('heat-map-level-4')
         expect(emptyDate?.getAttribute('data-article-count')).toBe('0')
         expect(emptyDate?.getAttribute('aria-label')).toContain('没有文章')
+        expect(emptyDate?.className).not.toContain('heat-map-level-0')
+    })
+
+    it('keeps the selected state alongside the heatmap level', () => {
+        const container = renderCalendar({'2026-01-15': 5}, '2026-01-15')
+        const selectedDate = container.querySelector(
+            '[data-date="2026-01-15"]'
+        )
+
+        expect(selectedDate?.className).toContain('heat-map-level-3')
+        expect(selectedDate?.className).toContain('is-selected')
     })
 })

@@ -9,7 +9,10 @@ function response(body: string, status = 200) {
 describe('EssayClient', () => {
     it('publishes content with the expected request', async () => {
         const httpClient = vi.fn(async () => response('{"id":"essay-id"}'))
-        const client = createEssayClient(httpClient)
+        const client = createEssayClient({
+            baseUrl: 'https://api.essay.ink///',
+            httpClient,
+        })
 
         await expect(client.publish('content', 'token')).resolves.toEqual({
             id: 'essay-id',
@@ -27,9 +30,11 @@ describe('EssayClient', () => {
     })
 
     it('preserves a server-provided error message', async () => {
-        const client = createEssayClient(async () =>
-            response('{"error":"invalid token"}', 401)
-        )
+        const client = createEssayClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () =>
+                response('{"error":"invalid token"}', 401),
+        })
 
         await expect(client.publish('content', 'token')).rejects.toThrow(
             'invalid token'
@@ -37,15 +42,20 @@ describe('EssayClient', () => {
     })
 
     it('normalizes network, non-JSON, and invalid success responses', async () => {
-        const networkClient = createEssayClient(async () => {
-            throw new Error('offline')
+        const networkClient = createEssayClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () => {
+                throw new Error('offline')
+            },
         })
-        const invalidErrorClient = createEssayClient(async () =>
-            response('bad gateway', 502)
-        )
-        const invalidSuccessClient = createEssayClient(async () =>
-            response('{"id":""}')
-        )
+        const invalidErrorClient = createEssayClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () => response('bad gateway', 502),
+        })
+        const invalidSuccessClient = createEssayClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () => response('{"id":""}'),
+        })
 
         await expect(networkClient.publish('', '')).rejects.toEqual(
             expect.any(EssayPublishError)

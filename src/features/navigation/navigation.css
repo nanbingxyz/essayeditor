@@ -199,6 +199,52 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     font-variant-numeric: tabular-nums;
 }
 
+:root {
+    --heat-map-level-0: #f6f6f6;
+    --heat-map-level-1: #d1ead6;
+    --heat-map-level-2: #ace7ae;
+    --heat-map-level-3: #69c16e;
+    --heat-map-level-4: #549f57;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        --heat-map-level-0: #151515;
+        --heat-map-level-1: #4a5447;
+        --heat-map-level-2: #63785e;
+        --heat-map-level-3: #1f432b;
+        --heat-map-level-4: #52a44e;
+    }
+}
+
+:root[data-theme='dark'] {
+    --heat-map-level-0: #151515;
+    --heat-map-level-1: #4a5447;
+    --heat-map-level-2: #63785e;
+    --heat-map-level-3: #1f432b;
+    --heat-map-level-4: #52a44e;
+}
+
+.calendar-day.heat-map-level-0 {
+    background-color: var(--heat-map-level-0);
+}
+
+.calendar-day.heat-map-level-1 {
+    background-color: var(--heat-map-level-1);
+}
+
+.calendar-day.heat-map-level-2 {
+    background-color: var(--heat-map-level-2);
+}
+
+.calendar-day.heat-map-level-3 {
+    background-color: var(--heat-map-level-3);
+}
+
+.calendar-day.heat-map-level-4 {
+    background-color: var(--heat-map-level-4);
+}
+
 .calendar-day:hover {
     background: hsl(var(--accent) / 0.82);
 }
@@ -276,10 +322,36 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     font-weight: 600;
 }
 
-.sidebar-user span {
+.sidebar-user-avatar {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 50%;
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--muted-foreground) / 0.16);
+    font-size: 12px;
+}
+
+.sidebar-user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.sidebar-user-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.sidebar-account-error {
+    padding: 0 4px;
+    color: hsl(var(--muted-foreground));
+    font-size: 13px;
 }
 
 .set-api-key-button {
