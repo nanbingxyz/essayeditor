@@ -9,9 +9,9 @@
 
     :root {
         color-scheme: light;
-        --background: 50 18% 92%;
+        --background: 0, 0%, 100%;
         --foreground: 0 0% 3.9%;
-        --card: 50 18% 95%;
+        --card: 300, 2%, 89%;
         --card-foreground: 0 0% 3.9%;
         --popover: 50 18% 93%;
         --popover-foreground: 0 0% 3.9%;
@@ -34,16 +34,16 @@
         --chart-4: 43 74% 66%;
         --chart-5: 27 87% 67%;
         --radius: 0.5rem;
-        --sidebar-background: 50 14% 91%;
-        --main-background: 50 18% 96%;
+        --sidebar-background: 300, 2%, 89%;
+        --main-background: 0, 0%, 100%;
     }
 
     @media (prefers-color-scheme: dark) {
         :root:not([data-theme='light']) {
             color-scheme: dark;
-            --background: 0 0% 3.9%;
+            --background: 0, 0%, 9%;
             --foreground: 0 0% 98%;
-            --card: 0 0% 6.5%;
+            --card: 0, 0%, 12%;
             --card-foreground: 0 0% 98%;
             --popover: 0 0% 3.9%;
             --popover-foreground: 0 0% 98%;
@@ -65,17 +65,17 @@
             --chart-3: 30 80% 55%;
             --chart-4: 280 65% 60%;
             --chart-5: 340 75% 55%;
-            --sidebar-background: 0 0% 5.5%;
-            --main-background: 0 0% 7.5%;
+            --sidebar-background: 0, 0%, 12%;
+            --main-background: 0, 0%, 9%;
         }
     }
 
     :root[data-theme='dark'] {
         color-scheme: dark;
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 6.5%;
-        --card-foreground: 0 0% 98%;
+        --background: 0, 0%, 9%;
+        --foreground: 0, 0%, 85%;
+        --card: 0, 0%, 12%;
+        --card-foreground: 0, 0%, 71%;
         --popover: 0 0% 3.9%;
         --popover-foreground: 0 0% 98%;
         --primary: 0 0% 98%;
@@ -96,8 +96,8 @@
         --chart-3: 30 80% 55%;
         --chart-4: 280 65% 60%;
         --chart-5: 340 75% 55%;
-        --sidebar-background: 0 0% 5.5%;
-        --main-background: 0 0% 7.5%;
+        --sidebar-background: 0, 0%, 12%;
+        --main-background: 0, 0%, 9%;
     }
 }
 
