@@ -81,6 +81,7 @@ describe('useEssayLibraryController', () => {
         )
         const client: EssayLibraryClient = {
             list,
+            remove: vi.fn(async () => undefined),
             update: vi.fn(async () => undefined),
         }
         const repository: DraftRepository = {
@@ -131,6 +132,7 @@ describe('useEssayLibraryController', () => {
             )
         const client: EssayLibraryClient = {
             list,
+            remove: vi.fn(async () => undefined),
             update: vi.fn(async () => undefined),
         }
         const repository: DraftRepository = {
@@ -168,6 +170,7 @@ describe('useEssayLibraryController', () => {
         )
         const client: EssayLibraryClient = {
             list,
+            remove: vi.fn(async () => undefined),
             update: vi.fn(async () => undefined),
         }
         const repository: DraftRepository = {
@@ -198,6 +201,7 @@ describe('useEssayLibraryController', () => {
     it('prepends a published draft by its real id without duplicates', async () => {
         const client: EssayLibraryClient = {
             list: vi.fn(async () => essays(2)),
+            remove: vi.fn(async () => undefined),
             update: vi.fn(async () => undefined),
         }
         const repository: DraftRepository = {
@@ -220,6 +224,32 @@ describe('useEssayLibraryController', () => {
         expect(getController().entries).toEqual([
             {id: '1', content: 'newly published'},
             {id: '0', content: 'published 0'},
+        ])
+    })
+
+    it('removes only the committed published essay', async () => {
+        const client: EssayLibraryClient = {
+            list: vi.fn(async () => essays(3)),
+            remove: vi.fn(async () => undefined),
+            update: vi.fn(async () => undefined),
+        }
+        const repository: DraftRepository = {
+            ...localDraftMethods(),
+            clear: vi.fn(async () => undefined),
+            load: vi.fn(async () => null),
+            save: vi.fn(async () => undefined),
+        }
+        const {getController} = renderController(client, repository)
+        await act(async () => {
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        act(() => getController().commitRemove('1'))
+
+        expect(getController().entries).toEqual([
+            {id: '0', content: 'published 0'},
+            {id: '2', content: 'published 2'},
         ])
     })
 })

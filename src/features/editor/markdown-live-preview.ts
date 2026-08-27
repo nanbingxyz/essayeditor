@@ -20,6 +20,7 @@ import {SyntaxNode} from '@lezer/common'
 
 export interface MarkdownLivePreviewOptions {
     openExternal: (url: string) => void
+    revealSyntaxOnInitialSelection?: boolean
 }
 
 export interface MarkdownTable {
@@ -119,11 +120,6 @@ function selectionTouches(view: EditorView, from: number, to: number) {
     return selectionTouchesState(view.state, from, to)
 }
 
-function lineIsActive(view: EditorView, position: number) {
-    const line = view.state.doc.lineAt(position)
-    return selectionTouches(view, line.from, line.to)
-}
-
 class TextWidget extends WidgetType {
     constructor(
         private readonly text: string,
@@ -211,6 +207,7 @@ class ImageWidget extends RevealWidget {
         image.alt = this.alt
         image.loading = 'lazy'
         image.decoding = 'async'
+        image.setAttribute('referrerpolicy', 'no-referrer')
         image.addEventListener('error', () => {
             image.remove()
             wrapper.classList.add('is-error')
@@ -326,9 +323,15 @@ function findLinkAt(view: EditorView, position: number) {
     return node?.name === 'Link' ? node : null
 }
 
-function buildDecorations(view: EditorView) {
+function buildDecorations(view: EditorView, revealSelection = true) {
     const ranges: Range<Decoration>[] = []
     const seen = new Set<string>()
+    const selectionTouchesPreview = (from: number, to: number) =>
+        revealSelection && selectionTouches(view, from, to)
+    const lineIsActivePreview = (position: number) => {
+        const line = view.state.doc.lineAt(position)
+        return selectionTouchesPreview(line.from, line.to)
+    }
 
     const add = (key: string, range: Range<Decoration>) => {
         if (!seen.has(key)) {
@@ -365,7 +368,10 @@ function buildDecorations(view: EditorView) {
                     node.name === 'HeaderMark' &&
                     node.parent &&
                     /^ATXHeading[1-4]$/.test(node.parent.name) &&
-                    !selectionTouches(view, node.parent.from, node.parent.to)
+                    !selectionTouchesPreview(
+                        node.parent.from,
+                        node.parent.to
+                    )
                 ) {
                     const hideTo =
                         view.state.sliceDoc(node.to, node.to + 1) === ' '
@@ -386,7 +392,7 @@ function buildDecorations(view: EditorView) {
                             node.to - 2
                         )
                     )
-                    if (!selectionTouches(view, node.from, node.to)) {
+                    if (!selectionTouchesPreview(node.from, node.to)) {
                         add(
                             `hide:${node.from}:${node.from + 2}`,
                             Decoration.replace({}).range(node.from, node.from + 2)
@@ -407,7 +413,7 @@ function buildDecorations(view: EditorView) {
                             node.to - 1
                         )
                     )
-                    if (!selectionTouches(view, node.from, node.to)) {
+                    if (!selectionTouchesPreview(node.from, node.to)) {
                         add(
                             `hide:${node.from}:${node.from + 1}`,
                             Decoration.replace({}).range(node.from, node.from + 1)
@@ -421,7 +427,7 @@ function buildDecorations(view: EditorView) {
                 }
 
                 if (node.name === 'Image') {
-                    if (!selectionTouches(view, node.from, node.to)) {
+                    if (!selectionTouchesPreview(node.from, node.to)) {
                         const image = getImageParts(view, node)
                         if (image) {
                             add(
@@ -454,7 +460,7 @@ function buildDecorations(view: EditorView) {
                         )
                     )
 
-                    if (!selectionTouches(view, node.from, node.to)) {
+                    if (!selectionTouchesPreview(node.from, node.to)) {
                         const hiddenRanges = [
                             [node.from, link.labelFrom],
                             [link.labelTo, link.urlFrom],
@@ -475,7 +481,7 @@ function buildDecorations(view: EditorView) {
 
                 if (node.name === 'QuoteMark') {
                     addLineClass(node.from, 'cm-md-blockquote')
-                    if (!lineIsActive(view, node.from)) {
+                    if (!lineIsActivePreview(node.from)) {
                         add(
                             `hide:${node.from}:${node.to}`,
                             Decoration.replace({}).range(node.from, node.to)
@@ -486,7 +492,7 @@ function buildDecorations(view: EditorView) {
 
                 if (node.name === 'ListMark') {
                     addLineClass(node.from, 'cm-md-list-item')
-                    if (!lineIsActive(view, node.from)) {
+                    if (!lineIsActivePreview(node.from)) {
                         const marker = /^\d/.test(source) ? source : '•'
                         add(
                             `list:${node.from}:${node.to}`,
@@ -578,6 +584,7 @@ function getSelectedBlockKeys(state: EditorState) {
 
 export function markdownLivePreview({
     openExternal,
+    revealSyntaxOnInitialSelection = true,
 }: MarkdownLivePreviewOptions): Extension {
     const openLinkFromPointer = (event: MouseEvent, view: EditorView) => {
         const position = view.posAtCoords({
@@ -623,19 +630,29 @@ export function markdownLivePreview({
     const inlineDecorations = ViewPlugin.fromClass(
         class {
             decorations: DecorationSet
+            private revealSelection = revealSyntaxOnInitialSelection
 
             constructor(view: EditorView) {
-                this.decorations = buildDecorations(view)
+                this.decorations = buildDecorations(
+                    view,
+                    this.revealSelection
+                )
             }
 
             update(update: ViewUpdate) {
+                if (update.docChanged || update.selectionSet) {
+                    this.revealSelection = true
+                }
                 if (
                     update.docChanged ||
                     update.selectionSet ||
                     update.viewportChanged ||
                     update.geometryChanged
                 ) {
-                    this.decorations = buildDecorations(update.view)
+                    this.decorations = buildDecorations(
+                        update.view,
+                        this.revealSelection
+                    )
                 }
             }
         },

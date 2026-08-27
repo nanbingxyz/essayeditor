@@ -62,6 +62,47 @@ describe('EssayLibraryClient', () => {
         )
     })
 
+    it('deletes an encoded essay id with authorization', async () => {
+        const httpClient = vi.fn(
+            async () => new Response(null, {status: 204})
+        )
+        const client = createEssayLibraryClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient,
+        })
+        const signal = new AbortController().signal
+
+        await client.remove('essay/id', 'token', signal)
+        expect(httpClient).toHaveBeenCalledWith(
+            'https://api.essay.ink/essays/essay%2Fid',
+            {
+                method: 'DELETE',
+                headers: {Authorization: 'Bearer token'},
+                signal,
+            }
+        )
+    })
+
+    it('normalizes delete failures', async () => {
+        const serverErrorClient = createEssayLibraryClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () => response('{"error":"denied"}', 403),
+        })
+        const networkClient = createEssayLibraryClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () => {
+                throw new Error('offline')
+            },
+        })
+
+        await expect(
+            serverErrorClient.remove('essay', 'token')
+        ).rejects.toThrow('denied')
+        await expect(
+            networkClient.remove('essay', 'token')
+        ).rejects.toEqual(expect.any(EssayLibraryError))
+    })
+
     it('rejects malformed lists and normalizes request failures', async () => {
         const malformedClient = createEssayLibraryClient({
             baseUrl: 'https://api.essay.ink',

@@ -2,6 +2,8 @@ import {createRoot, type Root} from 'react-dom/client'
 import {act} from 'react-dom/test-utils'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 
+import {Toaster} from '@/shared/ui'
+
 const {httpFetch, storeFiles} = vi.hoisted(() => ({
     httpFetch: vi.fn(),
     storeFiles: new Map<string, Map<string, unknown>>(),
@@ -44,6 +46,18 @@ vi.mock('@tauri-apps/plugin-store', () => ({
 import App from './App'
 
 const roots: Root[] = []
+
+async function settle(iterations = 8) {
+    for (let index = 0; index < iterations; index += 1) {
+        await Promise.resolve()
+    }
+}
+
+function buttonWithText(text: string) {
+    return Array.from(document.body.querySelectorAll('button')).find(
+        (button) => button.textContent?.trim() === text
+    ) as HTMLButtonElement | undefined
+}
 
 afterEach(() => {
     roots.splice(0).forEach((root) => act(() => root.unmount()))
@@ -265,5 +279,335 @@ describe('App navigation', () => {
                 body: JSON.stringify({content: 'Publish me'}),
             })
         )
+    })
+
+    it('requires confirmation before deleting a local draft and selects the first remaining draft', async () => {
+        storeFiles.set(
+            'drafts.bin',
+            new Map([
+                [
+                    'localDrafts',
+                    {
+                        version: 1,
+                        drafts: [
+                            {
+                                localId: 'newer',
+                                content: 'Delete me',
+                                createdAt: 2,
+                                updatedAt: 3,
+                            },
+                            {
+                                localId: 'older',
+                                content: 'Keep me',
+                                createdAt: 1,
+                                updatedAt: 1,
+                            },
+                        ],
+                    },
+                ],
+            ])
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(<App />)
+            await settle()
+        })
+
+        const deleteButton = container.querySelector(
+            'button[aria-label="删除文章"]'
+        ) as HTMLButtonElement
+        expect(deleteButton.closest('.editor-toolbar')).not.toBeNull()
+        expect(deleteButton.closest('.editor-footer')).toBeNull()
+        act(() => deleteButton.click())
+        expect(document.body.textContent).toContain('删除本地草稿？')
+        expect(document.body.textContent).toContain('此操作不可撤销')
+
+        act(() => buttonWithText('取消')?.click())
+        expect(container.querySelectorAll('.essay-new-item')).toHaveLength(2)
+
+        act(() => deleteButton.click())
+        await act(async () => {
+            buttonWithText('确认删除')?.click()
+            await settle(12)
+        })
+
+        expect(container.querySelectorAll('.essay-new-item')).toHaveLength(1)
+        expect(
+            container.querySelector('.essay-new-item.is-active')?.textContent
+        ).toBe('草稿Keep me')
+        expect(
+            (
+                storeFiles
+                    .get('drafts.bin')
+                    ?.get('localDrafts') as {drafts: Array<{localId: string}>}
+            ).drafts.map(({localId}) => localId)
+        ).toEqual(['older'])
+        expect(httpFetch).not.toHaveBeenCalled()
+    })
+
+    it('creates a blank draft after deleting the last document', async () => {
+        storeFiles.set(
+            'drafts.bin',
+            new Map([
+                [
+                    'localDrafts',
+                    {
+                        version: 1,
+                        drafts: [
+                            {
+                                localId: 'only',
+                                content: 'Last draft',
+                                createdAt: 1,
+                                updatedAt: 1,
+                            },
+                        ],
+                    },
+                ],
+            ])
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(<App />)
+            await settle()
+        })
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="删除文章"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => {
+            buttonWithText('确认删除')?.click()
+            await settle(12)
+        })
+
+        const storedDrafts = (
+            storeFiles
+                .get('drafts.bin')
+                ?.get('localDrafts') as {drafts: Array<{content: string}>}
+        ).drafts
+        expect(storedDrafts).toHaveLength(1)
+        expect(storedDrafts[0].content).toBe('')
+        expect(container.querySelectorAll('.essay-new-item')).toHaveLength(1)
+        expect(
+            container.querySelector('.essay-new-item.is-active')?.textContent
+        ).toBe('草稿')
+    })
+
+    it('deletes a published essay and its local override before selecting the first draft', async () => {
+        storeFiles.set(
+            'store.bin',
+            new Map([
+                ['accessToken', 'token'],
+                ['appearance', 'system'],
+            ])
+        )
+        storeFiles.set(
+            'drafts.bin',
+            new Map([
+                [
+                    'localDrafts',
+                    {
+                        version: 1,
+                        drafts: [
+                            {
+                                localId: 'local',
+                                content: 'Local first',
+                                createdAt: 1,
+                                updatedAt: 1,
+                            },
+                        ],
+                    },
+                ],
+                [
+                    'draft:essay:one',
+                    {
+                        version: 1,
+                        content: 'Locally modified',
+                        updatedAt: 2,
+                    },
+                ],
+            ])
+        )
+        let deleted = false
+        httpFetch.mockImplementation(
+            async (input: string | URL | Request, init?: RequestInit) => {
+                const url = String(input)
+                if (url.includes('/heatmap?')) {
+                    return new Response(
+                        JSON.stringify({
+                            user: {
+                                id: 'user',
+                                avatar: 'https://example.com/avatar.png',
+                                displayName: 'User',
+                            },
+                            heatmap: {},
+                        })
+                    )
+                }
+                if (url.includes('/essays?')) {
+                    return new Response(
+                        JSON.stringify(
+                            deleted
+                                ? [{id: 'two', content: 'Published two'}]
+                                : [
+                                      {id: 'one', content: 'Published one'},
+                                      {id: 'two', content: 'Published two'},
+                                  ]
+                        )
+                    )
+                }
+                if (
+                    url.endsWith('/essays/one') &&
+                    init?.method === 'DELETE'
+                ) {
+                    deleted = true
+                    return new Response(null, {status: 204})
+                }
+                throw new Error(`Unexpected request: ${url}`)
+            }
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(<App />)
+            await settle(12)
+        })
+        await act(async () => {
+            (
+                container.querySelector(
+                    '[data-document-id="essay:one"]'
+                ) as HTMLButtonElement
+            ).click()
+            await settle()
+        })
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="删除文章"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        expect(document.body.textContent).toContain('删除已发布文章？')
+        expect(document.body.textContent).toContain('网站上的文章数据')
+
+        await act(async () => {
+            buttonWithText('确认删除')?.click()
+            await settle(16)
+        })
+
+        expect(httpFetch).toHaveBeenCalledWith(
+            expect.stringMatching(/\/essays\/one$/),
+            expect.objectContaining({
+                method: 'DELETE',
+                headers: {Authorization: 'Bearer token'},
+            })
+        )
+        expect(storeFiles.get('drafts.bin')?.has('draft:essay:one')).toBe(false)
+        expect(
+            container.querySelector('[data-document-id="essay:one"]')
+        ).toBeNull()
+        expect(
+            container.querySelector('.essay-new-item.is-active')?.textContent
+        ).toBe('草稿Local first')
+    })
+
+    it('keeps a published essay selected when remote deletion fails', async () => {
+        storeFiles.set(
+            'store.bin',
+            new Map([
+                ['accessToken', 'token'],
+                ['appearance', 'system'],
+            ])
+        )
+        httpFetch.mockImplementation(
+            async (input: string | URL | Request, init?: RequestInit) => {
+                const url = String(input)
+                if (url.includes('/heatmap?')) {
+                    return new Response(
+                        JSON.stringify({
+                            user: {
+                                id: 'user',
+                                avatar: 'https://example.com/avatar.png',
+                                displayName: 'User',
+                            },
+                            heatmap: {},
+                        })
+                    )
+                }
+                if (url.includes('/essays?')) {
+                    return new Response(
+                        JSON.stringify([
+                            {id: 'one', content: 'Published one'},
+                        ])
+                    )
+                }
+                if (
+                    url.endsWith('/essays/one') &&
+                    init?.method === 'DELETE'
+                ) {
+                    return new Response('{"error":"not allowed"}', {
+                        status: 403,
+                    })
+                }
+                throw new Error(`Unexpected request: ${url}`)
+            }
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(
+                <>
+                    <App />
+                    <Toaster />
+                </>
+            )
+            await settle(12)
+        })
+        await act(async () => {
+            (
+                container.querySelector(
+                    '[data-document-id="essay:one"]'
+                ) as HTMLButtonElement
+            ).click()
+            await settle()
+        })
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="删除文章"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => {
+            buttonWithText('确认删除')?.click()
+            await settle(12)
+        })
+
+        expect(
+            container.querySelector('[data-document-id="essay:one"].is-active')
+        ).not.toBeNull()
+        expect(document.body.textContent).toContain('删除已发布文章？')
+        expect(document.body.textContent).toContain('删除失败')
+        expect(document.body.textContent).toContain('not allowed')
     })
 })

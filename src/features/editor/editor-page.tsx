@@ -1,4 +1,4 @@
-import { ShadowInnerIcon} from '@radix-ui/react-icons'
+import {ShadowInnerIcon} from '@radix-ui/react-icons'
 import {Send20Filled} from '@fluentui/react-icons'
 import {forwardRef} from 'react'
 import {Button} from '@/shared/ui'
@@ -10,6 +10,7 @@ interface EditorPageProps {
     active: boolean
     actionLabel: string
     backupTimestamp: number
+    disabled: boolean
     editorKey: string
     initialContent: string
     loading: boolean
@@ -25,6 +26,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
             active,
             actionLabel,
             backupTimestamp,
+            disabled,
             editorKey,
             initialContent,
             loading,
@@ -41,7 +43,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
                     key={editorKey}
                     ref={ref}
                     initialValue={initialContent}
-                    disabled={loading}
+                    disabled={disabled}
                     onChange={onContentChange}
                 />
             ) : (
@@ -65,13 +67,13 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
                     className="publish-button rounded-full"
                     aria-label={actionLabel}
                     title={actionLabel === '更新文章' ? '更新' : '发布'}
-                    disabled={loading || !publishReady}
+                    disabled={disabled || !publishReady}
                     onClick={onPublish}
                 >
                     {loading ? (
                         <ShadowInnerIcon className="animate-spin" />
                     ) : (
-                        <Send20Filled  className='-rotate-[18deg] ml-0.5' />
+                        <Send20Filled className="ml-0.5 -rotate-[18deg]" />
                     )}
                 </Button>
             </footer>

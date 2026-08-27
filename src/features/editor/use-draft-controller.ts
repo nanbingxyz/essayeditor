@@ -141,7 +141,7 @@ export function useDraftController({
         return saveQueueRef.current
     }, [enqueueSave, scheduleSave])
 
-    const clear = useCallback(async () => {
+    const clear = useCallback(async (notifyError = true) => {
         scheduleSave.cancel()
         try {
             await repository.clear(documentKeyRef.current)
@@ -150,7 +150,9 @@ export function useDraftController({
             setUpdatedAt(0)
             return true
         } catch {
-            onErrorRef.current()
+            if (notifyError) {
+                onErrorRef.current()
+            }
             return false
         }
     }, [repository, scheduleSave])

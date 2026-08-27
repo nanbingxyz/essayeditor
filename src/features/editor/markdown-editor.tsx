@@ -123,6 +123,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
                         markdownLivePreview({
                             openExternal: (url) =>
                                 void tauriDesktopAdapter.openExternal(url),
+                            revealSyntaxOnInitialSelection: false,
                         }),
                         EditorView.contentAttributes.of({
                             'aria-label': '文章内容',

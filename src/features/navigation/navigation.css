@@ -68,6 +68,24 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     margin-left: auto;
 }
 
+.editor-toolbar-actions {
+    display: flex;
+    margin-left: auto;
+    align-items: center;
+}
+
+.editor-toolbar-actions + .right-sidebar-toggle {
+    margin-left: 0;
+}
+
+.editor-delete-button {
+    color: hsl(var(--muted-foreground));
+}
+
+.editor-delete-button:hover {
+    color: hsl(var(--destructive));
+}
+
 .editor-toolbar {
     gap: 8px;
     border-bottom: 1px solid hsl(var(--border-secondary));

@@ -15,7 +15,11 @@ import {
 
 const views: EditorView[] = []
 
-function createView(source: string, cursor = source.length) {
+function createView(
+    source: string,
+    cursor = source.length,
+    revealSyntaxOnInitialSelection = true
+) {
     const parent = document.createElement('div')
     document.body.append(parent)
     const view = new EditorView({
@@ -26,7 +30,10 @@ function createView(source: string, cursor = source.length) {
             extensions: [
                 history(),
                 markdown({base: markdownLanguage}),
-                markdownLivePreview({openExternal: () => undefined}),
+                markdownLivePreview({
+                    openExternal: () => undefined,
+                    revealSyntaxOnInitialSelection,
+                }),
             ],
         }),
     })
@@ -50,6 +57,19 @@ describe('markdown live preview', () => {
         expect(headingLines[1].textContent).toBe('two')
         expect(view.dom.textContent).toContain('##### five')
         expect(view.state.doc.toString()).toBe(source)
+    })
+
+    it('hides heading syntax on the initial selection until editing starts', () => {
+        const view = createView('# title\n\nbody', 0, false)
+
+        expect(view.dom.querySelector('.cm-md-heading')?.textContent).toBe(
+            'title'
+        )
+
+        view.dispatch({selection: {anchor: 2}})
+        expect(view.dom.querySelector('.cm-md-heading')?.textContent).toBe(
+            '# title'
+        )
     })
 
     it('renders inline formatting and reveals syntax at the cursor', () => {
@@ -93,6 +113,11 @@ describe('markdown live preview', () => {
             view.dom.querySelector<HTMLImageElement>('.cm-md-image-preview img')
                 ?.src
         ).toBe('https://example.com/image.png')
+        expect(
+            view.dom
+                .querySelector<HTMLImageElement>('.cm-md-image-preview img')
+                ?.getAttribute('referrerpolicy')
+        ).toBe('no-referrer')
         expect(view.state.doc.toString()).toBe(source)
 
         const tableSource = [

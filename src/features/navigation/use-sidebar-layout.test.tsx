@@ -48,8 +48,11 @@ describe('useSidebarLayout', () => {
     it('derives right sidebar availability and supports keyboard resizing', () => {
         const getLayout = renderLayout()
 
-        expect(getLayout().rightSidebarVisible).toBe(true)
+        expect(getLayout().rightSidebarVisible).toBe(false)
         expect(getLayout().effectiveRightSidebarWidth).toBe(300)
+
+        act(() => getLayout().toggleRightSidebar())
+        expect(getLayout().rightSidebarVisible).toBe(true)
 
         const preventDefault = vi.fn()
         act(() =>

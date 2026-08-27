@@ -11,6 +11,7 @@ import {
 } from '@/features/activity'
 import {
     createDraftRepository,
+    DeleteDocumentButton,
     EditorPage,
     getLocalDraftDocumentKey,
     type LocalDraft,
@@ -41,6 +42,7 @@ import {tauriDesktopAdapter} from '@/shared/platform/desktop'
 import {ToastAction, useToast} from '@/shared/ui'
 
 import {essayApiBaseUrl} from './essay-api-config'
+import {getPublishedDocumentStatus} from './document-status'
 
 type ActiveDocument =
     | ({kind: 'draft'} & LocalDraft)
@@ -64,6 +66,16 @@ function activateDraft(draft: LocalDraft): ActiveDocument {
     return {kind: 'draft', ...draft}
 }
 
+function createRecoveryDraft(): LocalDraft {
+    const timestamp = Date.now()
+    return {
+        localId: `recovery-${timestamp}`,
+        content: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+    }
+}
+
 export default function App() {
     const {toast} = useToast()
     const [page, setPage] = useState<AppPage>('editor')
@@ -72,6 +84,7 @@ export default function App() {
         useState<ActiveDocument | null>(null)
     const [localDrafts, setLocalDrafts] = useState<LocalDraft[]>([])
     const [localDraftsReady, setLocalDraftsReady] = useState(false)
+    const [deleting, setDeleting] = useState(false)
     const [updating, setUpdating] = useState(false)
     const editorRef = useRef<MarkdownEditorHandle>(null)
     const localDraftsRef = useRef<LocalDraft[]>([])
@@ -285,13 +298,7 @@ export default function App() {
             if (cancelled) {
                 return
             }
-            const timestamp = Date.now()
-            const fallbackDraft: LocalDraft = {
-                localId: `recovery-${timestamp}`,
-                content: '',
-                createdAt: timestamp,
-                updatedAt: timestamp,
-            }
+            const fallbackDraft = createRecoveryDraft()
             setLocalDrafts([fallbackDraft])
             setActiveDocument(activateDraft(fallbackDraft))
             setLocalDraftsReady(true)
@@ -437,6 +444,109 @@ export default function App() {
         requestAnimationFrame(() => editorRef.current?.focus())
     }
 
+    const activateFirstAvailableDocument = async (
+        remainingDrafts: LocalDraft[],
+        remainingEssays: EssayListEntry[]
+    ) => {
+        const firstDraft = sortDrafts(remainingDrafts)[0]
+        if (firstDraft) {
+            setActiveDocument(activateDraft(firstDraft))
+            return
+        }
+
+        const firstEssay = remainingEssays[0]
+        if (firstEssay) {
+            setActiveDocument({
+                kind: 'published',
+                id: firstEssay.id,
+                content: firstEssay.content,
+            })
+            return
+        }
+
+        try {
+            const nextDraft = await draftRepository.createLocalDraft()
+            setLocalDrafts([nextDraft])
+            setActiveDocument(activateDraft(nextDraft))
+        } catch {
+            const fallbackDraft = createRecoveryDraft()
+            setLocalDrafts([fallbackDraft])
+            setActiveDocument(activateDraft(fallbackDraft))
+            notifyDraftError()
+        }
+    }
+
+    const deleteDocument = async () => {
+        if (!activeDocument || deleting) {
+            return false
+        }
+
+        const target = activeDocument
+        setDeleting(true)
+        try {
+            if (target.kind === 'draft') {
+                const cleared = await draft.clear(false)
+                if (!cleared) {
+                    throw new Error('无法删除本地草稿，请稍后重试')
+                }
+
+                const remainingDrafts = localDraftsRef.current.filter(
+                    (entry) => entry.localId !== target.localId
+                )
+                setLocalDrafts(remainingDrafts)
+                await activateFirstAvailableDocument(
+                    remainingDrafts,
+                    library.entries
+                )
+                toast({title: '草稿已删除'})
+                return true
+            }
+
+            if (!settings.accessToken) {
+                throw new Error('请先设置 API Key')
+            }
+
+            await essayLibraryClient.remove(
+                target.id,
+                settings.accessToken
+            )
+            const localBackupCleared = await draft.clear(false)
+            const remainingEssays = library.entries.filter(
+                (entry) => entry.id !== target.id
+            )
+            library.commitRemove(target.id)
+            await activateFirstAvailableDocument(
+                localDraftsRef.current,
+                remainingEssays
+            )
+            library.refresh()
+            activity.refresh()
+
+            if (localBackupCleared) {
+                toast({title: '文章已删除'})
+            } else {
+                toast({
+                    title: '文章已删除，但无法清理本地备份',
+                    description: '网站上的文章已删除，本地备份可能仍占用少量空间',
+                    variant: 'destructive',
+                })
+            }
+            return true
+        } catch (error) {
+            toast({
+                title: '删除失败',
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : '请稍后重试',
+                variant: 'destructive',
+            })
+            return false
+        } finally {
+            setDeleting(false)
+        }
+    }
+
     const createDraft = async () => {
         if (activeDocument && !(await draft.flush())) {
             return
@@ -529,11 +639,21 @@ export default function App() {
         )
     }
 
+    const activeEssayEntry =
+        activeDocument?.kind === 'published'
+            ? library.entries.find(
+                  (entry) => entry.id === activeDocument.id
+              )
+            : undefined
     const documentStatus =
         activeDocument?.kind === 'published'
-            ? draft.content === activeDocument.content
-                ? 'published'
-                : 'modified'
+            ? getPublishedDocumentStatus({
+                  baselineContent: activeDocument.content,
+                  currentContent: draft.content,
+                  draftReady: draft.ready,
+                  hasKnownLocalChanges:
+                      activeEssayEntry?.localContent !== undefined,
+              })
             : 'draft'
     const editorStatusLabel =
         documentStatus === 'draft'
@@ -558,6 +678,22 @@ export default function App() {
             accountLoading={activity.loading}
             articleCounts={activity.heatmap}
             editorStatusLabel={editorStatusLabel}
+            editorToolbarActions={
+                <DeleteDocumentButton
+                    deleting={deleting}
+                    disabled={Boolean(
+                        !activeDocument ||
+                            !draft.ready ||
+                            !localDraftsReady ||
+                            publishing.loading ||
+                            updating ||
+                            (activeDocument.kind === 'published' &&
+                                !settings.accessToken)
+                    )}
+                    onDelete={deleteDocument}
+                    published={activeDocument?.kind === 'published'}
+                />
+            }
             hasAccessToken={Boolean(settings.accessToken)}
             layout={layout}
             onOpenSettings={openSettings}
@@ -601,6 +737,7 @@ export default function App() {
                 active={page === 'editor'}
                 actionLabel={actionLabel}
                 backupTimestamp={draft.updatedAt}
+                disabled={publishing.loading || updating || deleting}
                 editorKey={activeDocumentKey}
                 initialContent={draft.initialContent}
                 loading={publishing.loading || updating}

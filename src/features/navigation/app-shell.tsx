@@ -45,6 +45,7 @@ interface AppShellProps {
     articleCounts: ArticleCountByDate
     children: ReactNode
     editorStatusLabel: string
+    editorToolbarActions?: ReactNode
     hasAccessToken: boolean
     layout: SidebarLayout
     onOpenSettings: () => void
@@ -92,6 +93,7 @@ export default function AppShell({
     articleCounts,
     children,
     editorStatusLabel,
+    editorToolbarActions,
     hasAccessToken,
     layout,
     onOpenSettings,
@@ -232,6 +234,11 @@ export default function AppShell({
                             className="editor-toolbar-title"
                         >
                             <span>{editorStatusLabel}</span>
+                        </div>
+                    )}
+                    {page === 'editor' && editorToolbarActions && (
+                        <div className="editor-toolbar-actions">
+                            {editorToolbarActions}
                         </div>
                     )}
                     {layout.rightSidebarAvailable && (

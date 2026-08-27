@@ -293,8 +293,15 @@ export function useEssayLibraryController({
         ])
     }, [])
 
+    const commitRemove = useCallback((essayId: string) => {
+        setEntries((current) =>
+            current.filter((entry) => entry.id !== essayId)
+        )
+    }, [])
+
     return {
         commitPublish,
+        commitRemove,
         commitUpdate,
         entries,
         error,

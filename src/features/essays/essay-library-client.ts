@@ -17,6 +17,11 @@ export interface EssayListQuery {
 
 export interface EssayLibraryClient {
     list: (query: EssayListQuery) => Promise<EssayListItem[]>
+    remove: (
+        essayId: string,
+        accessToken: string,
+        signal?: AbortSignal
+    ) => Promise<void>
     update: (
         essayId: string,
         content: string,
@@ -124,6 +129,34 @@ export function createEssayLibraryClient({
                 throw new EssayLibraryError('服务器返回了无效的文章列表')
             }
             return essays
+        },
+        remove: async (essayId, accessToken, signal) => {
+            let response: Response
+            try {
+                response = await httpClient(
+                    `${essaysUrl}/${encodeURIComponent(essayId)}`,
+                    {
+                        method: 'DELETE',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                        },
+                        signal,
+                    }
+                )
+            } catch (error) {
+                if (signal?.aborted) {
+                    throw error
+                }
+                throw new EssayLibraryError('网络连接失败，请稍后重试')
+            }
+
+            if (!response.ok) {
+                const body = await response.text().catch(() => '')
+                throw new EssayLibraryError(
+                    readErrorMessage(parseJson(body)) ??
+                        '删除失败，请稍后重试'
+                )
+            }
         },
         update: async (essayId, content, accessToken, signal) => {
             let response: Response

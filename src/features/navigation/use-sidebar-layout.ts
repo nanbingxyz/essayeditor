@@ -43,7 +43,7 @@ export function useSidebarLayout({
     const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(true)
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
     const [desktopRightSidebarVisible, setDesktopRightSidebarVisible] =
-        useState(true)
+        useState(false)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(
         DEFAULT_RIGHT_SIDEBAR_WIDTH
     )
