@@ -1,0 +1,434 @@
+.app-shell {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    color: hsl(var(--foreground));
+    background: hsl(var(--background));
+}
+
+.app-sidebar {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    width: 240px;
+    min-width: 0;
+    flex: 0 0 240px;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid hsl(var(--border));
+    background: hsl(var(--sidebar-background));
+    transition: flex-basis 180ms ease, width 180ms ease, transform 180ms ease;
+}
+
+.is-wide.sidebar-is-hidden .app-sidebar {
+    width: 0;
+    flex-basis: 0;
+    border-right-width: 0;
+}
+
+.titlebar-surface {
+    height: 46px;
+    flex: 0 0 46px;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.sidebar-titlebar,
+.main-titlebar {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+}
+
+html[data-platform='macos'] .app-shell,
+html[data-platform='macos'] .app-sidebar {
+    background: transparent;
+}
+
+html[data-platform='macos'] .sidebar-titlebar,
+html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
+    padding-left: 76px;
+}
+
+.sidebar-toggle {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    color: hsl(var(--muted-foreground));
+}
+
+.sidebar-toggle svg {
+    width: 17px;
+    height: 17px;
+}
+
+.right-sidebar-toggle {
+    margin-left: auto;
+}
+
+.editor-toolbar {
+    gap: 8px;
+    border-bottom: 1px solid hsl(var(--border-secondary));
+    background: hsl(var(--main-background));
+}
+
+.editor-toolbar-title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    padding: 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.editor-toolbar-title span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-list-region {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.sidebar-calendar {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    padding: 4px 12px 14px;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.calendar-header {
+    display: grid;
+    height: 34px;
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.calendar-navigation-button,
+.calendar-title-button,
+.calendar-day,
+.calendar-picker-button {
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease,
+        box-shadow 140ms ease;
+}
+
+.calendar-navigation-button:focus-visible,
+.calendar-title-button:focus-visible,
+.calendar-day:focus-visible,
+.calendar-picker-button:focus-visible {
+    outline: 1px solid hsl(var(--ring));
+    outline-offset: 1px;
+}
+
+.calendar-navigation-button {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: hsl(var(--muted-foreground));
+}
+
+.calendar-navigation-button:hover,
+.calendar-title-button:hover,
+.calendar-picker-button:hover {
+    color: hsl(var(--accent-foreground));
+    background: hsl(var(--accent) / 0.72);
+}
+
+.calendar-navigation-button svg {
+    width: 15px;
+    height: 15px;
+    stroke-width: 1.5;
+}
+
+.calendar-title-button {
+    min-width: 0;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.calendar-body {
+    height: 184px;
+}
+
+.calendar-weekdays,
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-weekdays {
+    height: 22px;
+    align-items: center;
+    color: hsl(var(--muted-foreground));
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.calendar-days {
+    grid-auto-rows: 27px;
+}
+
+.calendar-day {
+    position: relative;
+    width: 26px;
+    height: 26px;
+    place-self: center;
+    border-radius: 50%;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.calendar-day:hover {
+    background: hsl(var(--accent) / 0.82);
+}
+
+.calendar-day.is-outside-month {
+    color: hsl(var(--muted-foreground) / 0.45);
+}
+
+.calendar-day.is-today:not(.is-selected)::after {
+    position: absolute;
+    right: 50%;
+    bottom: 2px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    content: '';
+    transform: translateX(50%);
+}
+
+.calendar-day.is-selected {
+    color: hsl(var(--primary-foreground));
+    background: hsl(var(--primary));
+}
+
+.calendar-day.is-selected:hover {
+    background: hsl(var(--primary) / 0.88);
+}
+
+.calendar-picker-grid {
+    display: grid;
+    height: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    padding: 4px 0 2px;
+}
+
+.calendar-picker-button {
+    border-radius: 6px;
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.calendar-picker-button.is-current-value {
+    color: hsl(var(--foreground));
+    background: hsl(var(--accent));
+    font-weight: 600;
+}
+
+.sidebar-footer {
+    display: flex;
+    min-width: 240px;
+    flex: 0 0 64px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-top: 1px solid hsl(var(--border));
+}
+
+.sidebar-account-slot {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+}
+
+.sidebar-user {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+    padding: 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.sidebar-user span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.set-api-key-button {
+    height: 36px;
+    padding: 0 8px;
+    font-size: 14px;
+}
+
+.settings-button {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    color: hsl(var(--muted-foreground));
+}
+
+.sidebar-account-skeleton {
+    width: 105px;
+    height: 16px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: hsl(var(--muted-foreground) / 0.16);
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+.app-main {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    background: hsl(var(--main-background));
+}
+
+.app-right-sidebar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    width: var(--right-sidebar-width);
+    min-width: var(--right-sidebar-width);
+    flex: 0 0 var(--right-sidebar-width);
+    flex-direction: column;
+    border-left: 1px solid hsl(var(--border-secondary));
+    background: hsl(var(--main-background));
+}
+
+.right-sidebar-titlebar {
+    width: 100%;
+    border-bottom: 1px solid hsl(var(--border-secondary));
+}
+
+.right-sidebar-content {
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+}
+
+.right-sidebar-resizer {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    left: -5px;
+    width: 10px;
+    touch-action: none;
+    cursor: col-resize;
+}
+
+.right-sidebar-resizer::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    background: transparent;
+    content: '';
+    transition: background-color 120ms ease;
+}
+
+.right-sidebar-resizer:hover::after,
+.right-sidebar-resizer:focus-visible::after,
+.is-resizing-right-sidebar .right-sidebar-resizer::after {
+    background: hsl(var(--ring));
+}
+
+.right-sidebar-resizer:focus-visible {
+    outline: 0;
+}
+
+.is-resizing-right-sidebar,
+.is-resizing-right-sidebar * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+.main-titlebar {
+    position: relative;
+}
+
+.main-page-container {
+    min-height: 0;
+    flex: 1;
+}
+
+.is-page-hidden {
+    display: none;
+}
+
+.sidebar-backdrop {
+    position: absolute;
+    z-index: 20;
+    inset: 0;
+    padding: 0;
+    border: 0;
+    background: rgb(0 0 0 / 0.25);
+    animation: fade-in 180ms ease;
+}
+
+.is-narrow .app-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(240px, calc(100vw - 48px));
+    transform: translateX(-100%);
+    box-shadow: 12px 0 30px rgb(0 0 0 / 0.12);
+}
+
+.is-narrow.sidebar-is-visible .app-sidebar {
+    transform: translateX(0);
+}
+
+.is-narrow .sidebar-footer {
+    min-width: min(240px, calc(100vw - 48px));
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 0.45;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}

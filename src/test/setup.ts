@@ -31,3 +31,8 @@ Object.defineProperty(HTMLElement.prototype, 'getClientRects', {
     configurable: true,
     value: vi.fn(() => []),
 })
+
+Object.defineProperty(Range.prototype, 'getClientRects', {
+    configurable: true,
+    value: vi.fn(() => []),
+})

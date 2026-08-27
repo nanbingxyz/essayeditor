@@ -11,3 +11,6 @@ EssayEditor的功能纯粹直接：编辑与发布，旨在让你的创作体验
 EssayEditor 通过 Essay API 发布内容，需要先在 [Essay](https://www.essay.ink)的 ⎡API 设置⎦ 中启用 API 并获取 AccessToken。点击 EssayEditor 左下角的设置按钮，填写好AccessToken即可正常使用。
 ![填写 AccessToken](https://www.essay.ink/editor-accesstoken.png)
 
+## 开发
+
+前端采用按业务能力划分的 Feature 架构。目录边界、依赖方向、持久化约定和新增功能流程见 [ARCHITECTURE.md](./ARCHITECTURE.md)。

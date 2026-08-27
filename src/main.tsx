@@ -1,17 +1,20 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import { Toaster } from "@/components/ui/toaster";
-import Updater from "./components/updater";
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+
+import App from '@/app/App'
+import {Updater} from '@/features/updater'
+import {Toaster} from '@/shared/ui'
+
+import './App.css'
 
 document.documentElement.dataset.platform = navigator.userAgent.includes('Mac')
-  ? 'macos'
-  : 'windows'
+    ? 'macos'
+    : 'windows'
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-    <Toaster/>
-    <Updater/>
-  </React.StrictMode>,
-);
+    <React.StrictMode>
+        <App />
+        <Toaster />
+        <Updater />
+    </React.StrictMode>
+)
