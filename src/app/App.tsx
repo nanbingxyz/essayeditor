@@ -12,7 +12,8 @@ import {
 import {
     createDraftRepository,
     EditorPage,
-    NEW_DRAFT_KEY,
+    getLocalDraftDocumentKey,
+    type LocalDraft,
     type MarkdownEditorHandle,
     useDraftController,
 } from '@/features/editor'
@@ -36,25 +37,45 @@ import {
     SettingsPage,
     useSettingsController,
 } from '@/features/settings'
-import {ToastAction, useToast} from '@/shared/ui'
 import {tauriDesktopAdapter} from '@/shared/platform/desktop'
+import {ToastAction, useToast} from '@/shared/ui'
 
 import {essayApiBaseUrl} from './essay-api-config'
 
 type ActiveDocument =
-    | {kind: 'new'}
+    | ({kind: 'draft'} & LocalDraft)
     | {kind: 'published'; content: string; id: string}
+
+interface PendingPublish {
+    content: string
+    localId: string
+}
+
+function sortDrafts(drafts: LocalDraft[]) {
+    return [...drafts].sort(
+        (left, right) =>
+            right.updatedAt - left.updatedAt ||
+            right.createdAt - left.createdAt ||
+            left.localId.localeCompare(right.localId)
+    )
+}
+
+function activateDraft(draft: LocalDraft): ActiveDocument {
+    return {kind: 'draft', ...draft}
+}
 
 export default function App() {
     const {toast} = useToast()
     const [page, setPage] = useState<AppPage>('editor')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
-    const [activeDocument, setActiveDocument] = useState<ActiveDocument>({
-        kind: 'new',
-    })
-    const [newDraftContent, setNewDraftContent] = useState('')
+    const [activeDocument, setActiveDocument] =
+        useState<ActiveDocument | null>(null)
+    const [localDrafts, setLocalDrafts] = useState<LocalDraft[]>([])
+    const [localDraftsReady, setLocalDraftsReady] = useState(false)
     const [updating, setUpdating] = useState(false)
     const editorRef = useRef<MarkdownEditorHandle>(null)
+    const localDraftsRef = useRef<LocalDraft[]>([])
+    const pendingPublishRef = useRef<PendingPublish | null>(null)
 
     const settingsRepository = useMemo(createSettingsRepository, [])
     const draftRepository = useMemo(createDraftRepository, [])
@@ -70,6 +91,8 @@ export default function App() {
         () => createEssayLibraryClient({baseUrl: essayApiBaseUrl}),
         []
     )
+
+    localDraftsRef.current = localDrafts
 
     const notifySettingsLoadError = useCallback(() => {
         toast({
@@ -100,15 +123,19 @@ export default function App() {
         onAppearanceSaveError: notifyAppearanceSaveError,
         onLoadError: notifySettingsLoadError,
     })
+    const activeDocumentKey =
+        activeDocument?.kind === 'published'
+            ? `essay:${activeDocument.id}`
+            : activeDocument?.kind === 'draft'
+              ? getLocalDraftDocumentKey(activeDocument.localId)
+              : 'loading'
     const draft = useDraftController({
         baselineContent:
-            activeDocument.kind === 'published'
+            activeDocument?.kind === 'published'
                 ? activeDocument.content
                 : '',
-        documentKey:
-            activeDocument.kind === 'published'
-                ? `essay:${activeDocument.id}`
-                : NEW_DRAFT_KEY,
+        documentKey: activeDocumentKey,
+        persistBaseline: activeDocument?.kind === 'draft',
         repository: draftRepository,
         onError: notifyDraftError,
     })
@@ -165,9 +192,43 @@ export default function App() {
 
     const handlePublishSuccess = useCallback(
         async (id: string) => {
-            await draft.clear()
-            editorRef.current?.setValue('')
-            setNewDraftContent('')
+            const publishedDraft = pendingPublishRef.current
+            if (!publishedDraft) {
+                return
+            }
+            pendingPublishRef.current = null
+
+            setLocalDrafts((current) =>
+                current.filter(
+                    (draft) => draft.localId !== publishedDraft.localId
+                )
+            )
+            setActiveDocument((current) =>
+                current?.kind === 'draft' &&
+                current.localId === publishedDraft.localId
+                    ? {
+                          kind: 'published',
+                          id,
+                          content: publishedDraft.content,
+                      }
+                    : current
+            )
+            if (!selectedDate) {
+                library.commitPublish(id, publishedDraft.content)
+            }
+
+            try {
+                await draftRepository.removeLocalDraft(
+                    publishedDraft.localId
+                )
+            } catch {
+                toast({
+                    title: '文章已发布，但无法清理本地草稿',
+                    description: '远端文章已保存，请勿再次发布该草稿',
+                    variant: 'destructive',
+                })
+            }
+
             library.refresh()
             activity.refresh()
             toast({
@@ -187,7 +248,7 @@ export default function App() {
                 ),
             })
         },
-        [activity, draft, library, toast]
+        [activity, draftRepository, library, selectedDate, toast]
     )
 
     const publishing = usePublishingController({
@@ -205,10 +266,75 @@ export default function App() {
     })
 
     useEffect(() => {
-        if (activeDocument.kind === 'new' && draft.ready) {
-            setNewDraftContent(draft.content)
+        let cancelled = false
+
+        void (async () => {
+            let drafts = await draftRepository.listLocalDrafts()
+            if (drafts.length === 0) {
+                drafts = [await draftRepository.createLocalDraft()]
+            }
+            if (cancelled) {
+                return
+            }
+
+            const sortedDrafts = sortDrafts(drafts)
+            setLocalDrafts(sortedDrafts)
+            setActiveDocument(activateDraft(sortedDrafts[0]))
+            setLocalDraftsReady(true)
+        })().catch(() => {
+            if (cancelled) {
+                return
+            }
+            const timestamp = Date.now()
+            const fallbackDraft: LocalDraft = {
+                localId: `recovery-${timestamp}`,
+                content: '',
+                createdAt: timestamp,
+                updatedAt: timestamp,
+            }
+            setLocalDrafts([fallbackDraft])
+            setActiveDocument(activateDraft(fallbackDraft))
+            setLocalDraftsReady(true)
+            notifyDraftError()
+        })
+
+        return () => {
+            cancelled = true
         }
-    }, [activeDocument.kind, draft.content, draft.ready])
+    }, [draftRepository, notifyDraftError])
+
+    useEffect(() => {
+        if (
+            activeDocument?.kind !== 'draft' ||
+            !draft.ready ||
+            !localDraftsReady
+        ) {
+            return
+        }
+
+        setLocalDrafts((current) =>
+            sortDrafts(
+                current.map((entry) =>
+                    entry.localId === activeDocument.localId
+                        ? {
+                              ...entry,
+                              content: draft.content,
+                              updatedAt: draft.updatedAt || entry.updatedAt,
+                          }
+                        : entry
+                )
+            )
+        )
+    }, [
+        activeDocument?.kind,
+        activeDocument?.kind === 'draft'
+            ? activeDocument.localId
+            : null,
+        draft.content,
+        draft.ready,
+        draft.updatedAt,
+        localDraftsReady,
+    ])
 
     useEffect(() => {
         void tauriDesktopAdapter.showMainWindow().catch((error) => {
@@ -237,6 +363,9 @@ export default function App() {
     }
 
     const saveDocument = async () => {
+        if (!activeDocument) {
+            return
+        }
         if (!settings.accessToken) {
             openSettings()
             toast({
@@ -253,8 +382,18 @@ export default function App() {
         }
 
         const content = editorRef.current?.getValue() ?? draft.content
-        if (activeDocument.kind === 'new') {
-            await publishing.publish(content, settings.accessToken)
+        if (activeDocument.kind === 'draft') {
+            pendingPublishRef.current = {
+                localId: activeDocument.localId,
+                content,
+            }
+            const published = await publishing.publish(
+                content,
+                settings.accessToken
+            )
+            if (!published) {
+                pendingPublishRef.current = null
+            }
             return
         }
         if (content === activeDocument.content) {
@@ -298,27 +437,56 @@ export default function App() {
         requestAnimationFrame(() => editorRef.current?.focus())
     }
 
-    const selectNewDocument = async () => {
-        if (activeDocument.kind === 'new') {
+    const createDraft = async () => {
+        if (activeDocument && !(await draft.flush())) {
+            return
+        }
+
+        const emptyDraft = localDraftsRef.current.find(
+            (entry) => !entry.content.trim()
+        )
+        if (emptyDraft) {
+            setActiveDocument(activateDraft(emptyDraft))
             showEditor()
             return
         }
-        if (!(await draft.flush())) {
+
+        try {
+            const nextDraft = await draftRepository.createLocalDraft()
+            setLocalDrafts((current) =>
+                sortDrafts([nextDraft, ...current])
+            )
+            setActiveDocument(activateDraft(nextDraft))
+            showEditor()
+        } catch {
+            notifyDraftError()
+        }
+    }
+
+    const selectDraft = async (nextDraft: LocalDraft) => {
+        if (
+            activeDocument?.kind === 'draft' &&
+            activeDocument.localId === nextDraft.localId
+        ) {
+            showEditor()
             return
         }
-        setActiveDocument({kind: 'new'})
+        if (activeDocument && !(await draft.flush())) {
+            return
+        }
+        setActiveDocument(activateDraft(nextDraft))
         showEditor()
     }
 
     const selectEssay = async (essay: EssayListEntry) => {
         if (
-            activeDocument.kind === 'published' &&
+            activeDocument?.kind === 'published' &&
             activeDocument.id === essay.id
         ) {
             showEditor()
             return
         }
-        if (!(await draft.flush())) {
+        if (activeDocument && !(await draft.flush())) {
             return
         }
         setActiveDocument({
@@ -330,16 +498,29 @@ export default function App() {
     }
 
     const changeSelectedDate = async (date: string | null) => {
-        if (!(await draft.flush())) {
+        if (activeDocument && !(await draft.flush())) {
             return
         }
         setSelectedDate(date)
     }
 
     const handleContentChange = (content: string) => {
+        if (!activeDocument) {
+            return
+        }
         draft.onContentChange(content)
-        if (activeDocument.kind === 'new') {
-            setNewDraftContent(content)
+        if (activeDocument.kind === 'draft') {
+            const updatedAt = Date.now()
+            setActiveDocument({...activeDocument, content, updatedAt})
+            setLocalDrafts((current) =>
+                sortDrafts(
+                    current.map((entry) =>
+                        entry.localId === activeDocument.localId
+                            ? {...entry, content, updatedAt}
+                            : entry
+                    )
+                )
+            )
             return
         }
         library.setLocalContent(
@@ -349,11 +530,11 @@ export default function App() {
     }
 
     const documentStatus =
-        activeDocument.kind === 'new'
-            ? 'draft'
-            : draft.content === activeDocument.content
-              ? 'published'
-              : 'modified'
+        activeDocument?.kind === 'published'
+            ? draft.content === activeDocument.content
+                ? 'published'
+                : 'modified'
+            : 'draft'
     const editorStatusLabel =
         documentStatus === 'draft'
             ? '草稿'
@@ -385,12 +566,8 @@ export default function App() {
             selectedDate={selectedDate}
             sidebarContent={
                 <SidebarEssayList
-                    activeEssayId={
-                        activeDocument.kind === 'published'
-                            ? activeDocument.id
-                            : null
-                    }
-                    activeIsNew={activeDocument.kind === 'new'}
+                    activeDocumentId={activeDocumentKey}
+                    drafts={localDrafts}
                     entries={library.entries}
                     error={listError}
                     hasMore={library.hasMore}
@@ -401,13 +578,18 @@ export default function App() {
                     }
                     loadingMore={library.loadingMore}
                     moreError={library.moreError}
-                    newDraftContent={newDraftContent}
+                    onCreateDraft={() => void createDraft()}
                     onLoadMore={() => void library.loadMore()}
+                    onRefresh={library.refresh}
                     onRetry={
                         activity.error ? activity.refresh : library.retry
                     }
+                    onSelectDraft={(entry) => void selectDraft(entry)}
                     onSelectEssay={(essay) => void selectEssay(essay)}
-                    onSelectNew={() => void selectNewDocument()}
+                    refreshDisabled={Boolean(
+                        !settings.accessToken || activity.error
+                    )}
+                    refreshing={library.refreshing}
                     selectedDate={selectedDate}
                 />
             }
@@ -419,21 +601,21 @@ export default function App() {
                 active={page === 'editor'}
                 actionLabel={actionLabel}
                 backupTimestamp={draft.updatedAt}
-                editorKey={
-                    activeDocument.kind === 'published'
-                        ? `essay:${activeDocument.id}`
-                        : NEW_DRAFT_KEY
-                }
+                editorKey={activeDocumentKey}
                 initialContent={draft.initialContent}
                 loading={publishing.loading || updating}
                 onContentChange={handleContentChange}
                 onPublish={() => void saveDocument()}
-                publishReady={
-                    draft.ready &&
-                    settings.ready &&
-                    documentStatus !== 'published'
-                }
-                ready={draft.ready}
+                publishReady={Boolean(
+                    activeDocument &&
+                        draft.ready &&
+                        localDraftsReady &&
+                        settings.ready &&
+                        documentStatus !== 'published'
+                )}
+                ready={Boolean(
+                    activeDocument && draft.ready && localDraftsReady
+                )}
             />
             <div
                 className={`settings-page-container ${

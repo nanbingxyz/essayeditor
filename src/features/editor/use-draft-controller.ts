@@ -10,6 +10,7 @@ interface DraftControllerOptions {
     baselineContent: string
     documentKey: string
     onError: () => void
+    persistBaseline?: boolean
     repository: DraftRepository
 }
 
@@ -23,6 +24,7 @@ export function useDraftController({
     baselineContent,
     documentKey,
     onError,
+    persistBaseline = false,
     repository,
 }: DraftControllerOptions) {
     const [content, setContent] = useState('')
@@ -56,7 +58,7 @@ export function useDraftController({
 
             const task = saveQueueRef.current.then(async () => {
                 try {
-                    if (content === baselineContent) {
+                    if (content === baselineContent && !persistBaseline) {
                         await repository.clear(documentKey)
                     } else {
                         await repository.save(documentKey, snapshot)
@@ -69,7 +71,9 @@ export function useDraftController({
                         persistedContentRef.current = content
                         needsSaveRef.current = false
                         setUpdatedAt(
-                            content === baselineContent ? 0 : timestamp
+                            content === baselineContent && !persistBaseline
+                                ? 0
+                                : timestamp
                         )
                     }
                     if (pendingSaveRef.current === pending) {
@@ -91,7 +95,7 @@ export function useDraftController({
             saveQueueRef.current = task
             return task
         },
-        [repository]
+        [persistBaseline, repository]
     )
 
     const scheduleSave = useMemo(
@@ -174,11 +178,12 @@ export function useDraftController({
                 setContent(effectiveContent)
                 setInitialContent(effectiveContent)
                 setUpdatedAt(
-                    draft && draft.content !== baselineContent
+                    draft &&
+                        (persistBaseline || draft.content !== baselineContent)
                         ? draft.updatedAt
                         : 0
                 )
-                if (draft?.content === baselineContent) {
+                if (draft?.content === baselineContent && !persistBaseline) {
                     void repository.clear(documentKey).catch(() => undefined)
                 }
             })
@@ -207,6 +212,7 @@ export function useDraftController({
         baselineContent,
         documentIdentity,
         documentKey,
+        persistBaseline,
         repository,
         scheduleSave,
     ])

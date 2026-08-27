@@ -90,10 +90,68 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     white-space: nowrap;
 }
 
+.sidebar-create-action {
+    flex: 0 0 auto;
+    padding: 6px 12px 3px 12px;
+}
+
+.sidebar-create-button {
+    width: 100%;
+}
+
+
 .sidebar-list-region {
     min-height: 0;
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior-y: contain;
+}
+
+.pull-refresh-indicator {
+    display: flex;
+    height: var(--pull-refresh-distance, 0);
+    min-height: 0;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 6px;
+    overflow: hidden;
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    line-height: 30px;
+    transition: height 180ms ease, opacity 180ms ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.sidebar-list-region.is-pulling .pull-refresh-indicator {
+    transition: none;
+}
+
+.pull-refresh-icon {
+    display: inline-block;
+    font-size: 15px;
+    transition: transform 160ms ease;
+}
+
+.sidebar-list-region.is-armed:not(.is-refreshing) .pull-refresh-icon {
+    transform: rotate(180deg);
+}
+
+.sidebar-list-region.is-refreshing .pull-refresh-icon {
+    width: 13px;
+    height: 13px;
+    margin-bottom: 8px;
+    border: 1.5px solid hsl(var(--muted-foreground) / 0.28);
+    border-top-color: hsl(var(--muted-foreground));
+    border-radius: 50%;
+    color: transparent;
+    animation: pull-refresh-spin 700ms linear infinite;
+}
+
+@keyframes pull-refresh-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .essay-index {
@@ -439,10 +497,10 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
 .sidebar-footer {
     display: flex;
     min-width: 240px;
-    flex: 0 0 64px;
+    flex: 0 0 48px;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px;
+    padding: 0 12px;
     border-top: 1px solid hsl(var(--border));
 }
 

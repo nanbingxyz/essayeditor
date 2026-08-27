@@ -9,6 +9,19 @@ type DraftController = ReturnType<typeof useDraftController>
 
 const roots: Root[] = []
 
+function localDraftMethods() {
+    return {
+        createLocalDraft: vi.fn(async () => ({
+            localId: 'local',
+            content: '',
+            createdAt: 1,
+            updatedAt: 1,
+        })),
+        listLocalDrafts: vi.fn(async () => []),
+        removeLocalDraft: vi.fn(async () => undefined),
+    }
+}
+
 function renderController(
     repository: DraftRepository,
     {
@@ -55,6 +68,7 @@ afterEach(() => {
 describe('useDraftController', () => {
     it('waits for restoration and only persists the latest debounced content', async () => {
         const repository: DraftRepository = {
+            ...localDraftMethods(),
             clear: vi.fn(async () => undefined),
             load: vi.fn(
                 async (): Promise<DraftSnapshot> => ({
@@ -90,6 +104,7 @@ describe('useDraftController', () => {
 
     it('clears persistence when the editor becomes empty', async () => {
         const repository: DraftRepository = {
+            ...localDraftMethods(),
             clear: vi.fn(async () => undefined),
             load: vi.fn(async () => null),
             save: vi.fn(async () => undefined),
@@ -113,9 +128,10 @@ describe('useDraftController', () => {
 
     it('restores an essay override and clears it when content matches published', async () => {
         const repository: DraftRepository = {
+            ...localDraftMethods(),
             clear: vi.fn(async () => undefined),
             load: vi.fn(async () => ({
-                version: 1,
+                version: 1 as const,
                 content: 'local edit',
                 updatedAt: 100,
             })),
@@ -136,5 +152,44 @@ describe('useDraftController', () => {
 
         expect(repository.clear).toHaveBeenCalledWith('essay:one')
         expect(getController().updatedAt).toBe(0)
+    })
+
+    it('persists an empty local draft when baseline retention is enabled', async () => {
+        const repository: DraftRepository = {
+            ...localDraftMethods(),
+            clear: vi.fn(async () => undefined),
+            load: vi.fn(async () => null),
+            save: vi.fn(async () => undefined),
+        }
+        const container = document.createElement('div')
+        document.body.append(container)
+        const root = createRoot(container)
+        roots.push(root)
+        let controller: DraftController | undefined
+
+        function Harness() {
+            controller = useDraftController({
+                baselineContent: '',
+                documentKey: 'local:one',
+                persistBaseline: true,
+                repository,
+                onError: vi.fn(),
+            })
+            return null
+        }
+
+        act(() => root.render(<Harness />))
+        await act(async () => Promise.resolve())
+        act(() => {
+            controller?.onContentChange('')
+            vi.advanceTimersByTime(1000)
+        })
+        await act(async () => controller?.flush())
+
+        expect(repository.save).toHaveBeenCalledWith(
+            'local:one',
+            expect.objectContaining({content: ''})
+        )
+        expect(repository.clear).not.toHaveBeenCalled()
     })
 })

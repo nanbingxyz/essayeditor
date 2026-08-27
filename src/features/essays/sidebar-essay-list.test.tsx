@@ -28,23 +28,95 @@ describe('markdownToSummary', () => {
 })
 
 describe('SidebarEssayList', () => {
+    it('keeps the create action fixed before drafts and published entries', () => {
+        const container = document.body.appendChild(document.createElement('div'))
+        const root = createRoot(container)
+        const onCreateDraft = vi.fn()
+        act(() =>
+            root.render(
+                <SidebarEssayList
+                    activeDocumentId="local:newer"
+                    drafts={[
+                        {
+                            localId: 'newer',
+                            content: 'Newest draft',
+                            createdAt: 2,
+                            updatedAt: 3,
+                        },
+                        {
+                            localId: 'older',
+                            content: 'Older draft',
+                            createdAt: 1,
+                            updatedAt: 1,
+                        },
+                    ]}
+                    entries={[{id: 'published', content: 'Published essay'}]}
+                    error={null}
+                    hasMore={false}
+                    loading={false}
+                    loadingMore={false}
+                    moreError={null}
+                    onCreateDraft={onCreateDraft}
+                    onLoadMore={vi.fn()}
+                    onRefresh={vi.fn()}
+                    onRetry={vi.fn()}
+                    onSelectDraft={vi.fn()}
+                    onSelectEssay={vi.fn()}
+                    refreshDisabled={false}
+                    refreshing={false}
+                    selectedDate="2026-08-27"
+                />
+            )
+        )
+
+        const createAction = container.querySelector('.sidebar-create-action')!
+        const listRegion = container.querySelector('.sidebar-list-region')!
+        expect(
+            createAction.compareDocumentPosition(listRegion) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).not.toBe(0)
+        expect(
+            Array.from(container.querySelectorAll('.essay-index-preview')).map(
+                (node) => node.textContent
+            )
+        ).toEqual(['Newest draft', 'Older draft', 'Published essay'])
+
+        act(() =>
+            (createAction.querySelector('button') as HTMLButtonElement).click()
+        )
+        expect(onCreateDraft).toHaveBeenCalledTimes(1)
+
+        act(() => root.unmount())
+        container.remove()
+    })
+
     it('renders loading rows and marks locally modified essays', () => {
         const container = document.body.appendChild(document.createElement('div'))
         const root = createRoot(container)
         const props = {
-            activeEssayId: null,
-            activeIsNew: true,
+            activeDocumentId: 'local:draft-one',
+            drafts: [
+                {
+                    localId: 'draft-one',
+                    content: '',
+                    createdAt: 1,
+                    updatedAt: 1,
+                },
+            ],
             entries: [],
             error: null,
             hasMore: false,
             loading: true,
             loadingMore: false,
             moreError: null,
-            newDraftContent: '',
+            onCreateDraft: vi.fn(),
             onLoadMore: vi.fn(),
+            onRefresh: vi.fn(),
             onRetry: vi.fn(),
+            onSelectDraft: vi.fn(),
             onSelectEssay: vi.fn(),
-            onSelectNew: vi.fn(),
+            refreshDisabled: false,
+            refreshing: false,
             selectedDate: null,
         }
         act(() => root.render(<SidebarEssayList {...props} />))
@@ -55,8 +127,7 @@ describe('SidebarEssayList', () => {
                 <SidebarEssayList
                     {...props}
                     loading={false}
-                    activeEssayId="one"
-                    activeIsNew={false}
+                    activeDocumentId="essay:one"
                     entries={[
                         {
                             id: 'one',
@@ -74,6 +145,197 @@ describe('SidebarEssayList', () => {
         expect(
             container.querySelector('button[aria-label$="有本地更改"]')
         ).not.toBeNull()
+
+        act(() => root.unmount())
+        container.remove()
+    })
+
+    it('refreshes after pulling past the threshold at the top', () => {
+        const container = document.body.appendChild(document.createElement('div'))
+        const root = createRoot(container)
+        const onRefresh = vi.fn()
+        act(() =>
+            root.render(
+                <SidebarEssayList
+                    activeDocumentId="local:draft-one"
+                    drafts={[
+                        {
+                            localId: 'draft-one',
+                            content: '',
+                            createdAt: 1,
+                            updatedAt: 1,
+                        },
+                    ]}
+                    entries={[]}
+                    error={null}
+                    hasMore={false}
+                    loading={false}
+                    loadingMore={false}
+                    moreError={null}
+                    onCreateDraft={vi.fn()}
+                    onLoadMore={vi.fn()}
+                    onRefresh={onRefresh}
+                    onRetry={vi.fn()}
+                    onSelectDraft={vi.fn()}
+                    onSelectEssay={vi.fn()}
+                    refreshDisabled={false}
+                    refreshing={false}
+                    selectedDate={null}
+                />
+            )
+        )
+
+        const region = container.querySelector('.sidebar-list-region')!
+        const pointerEvent = (type: string, clientY: number) => {
+            const event = new MouseEvent(type, {
+                bubbles: true,
+                button: 0,
+                cancelable: true,
+                clientY,
+            })
+            Object.defineProperties(event, {
+                isPrimary: {value: true},
+                pointerId: {value: 1},
+                pointerType: {value: 'mouse'},
+            })
+            region.dispatchEvent(event)
+        }
+
+        act(() => {
+            pointerEvent('pointerdown', 10)
+            pointerEvent('pointermove', 150)
+        })
+        expect(container.textContent).toContain('松开刷新')
+
+        act(() => pointerEvent('pointerup', 150))
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+        expect(container.textContent).toContain('正在刷新')
+
+        act(() => root.unmount())
+        container.remove()
+    })
+
+    it('does not capture clicks that start on an article button', () => {
+        const container = document.body.appendChild(document.createElement('div'))
+        const root = createRoot(container)
+        const onSelectEssay = vi.fn()
+        act(() =>
+            root.render(
+                <SidebarEssayList
+                    activeDocumentId="local:draft-one"
+                    drafts={[
+                        {
+                            localId: 'draft-one',
+                            content: '',
+                            createdAt: 1,
+                            updatedAt: 1,
+                        },
+                    ]}
+                    entries={[{id: 'one', content: 'Published'}]}
+                    error={null}
+                    hasMore={false}
+                    loading={false}
+                    loadingMore={false}
+                    moreError={null}
+                    onCreateDraft={vi.fn()}
+                    onLoadMore={vi.fn()}
+                    onRefresh={vi.fn()}
+                    onRetry={vi.fn()}
+                    onSelectDraft={vi.fn()}
+                    onSelectEssay={onSelectEssay}
+                    refreshDisabled={false}
+                    refreshing={false}
+                    selectedDate={null}
+                />
+            )
+        )
+
+        const region = container.querySelector(
+            '.sidebar-list-region'
+        ) as HTMLDivElement
+        const articleButton = container.querySelector(
+            '.essay-index-item:not(.essay-new-item)'
+        ) as HTMLButtonElement
+        const setPointerCapture = vi.fn()
+        region.setPointerCapture = setPointerCapture
+
+        const pointerDown = new MouseEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            cancelable: true,
+            clientY: 10,
+        })
+        Object.defineProperties(pointerDown, {
+            isPrimary: {value: true},
+            pointerId: {value: 1},
+            pointerType: {value: 'mouse'},
+        })
+
+        act(() => {
+            articleButton.dispatchEvent(pointerDown)
+            articleButton.click()
+        })
+
+        expect(setPointerCapture).not.toHaveBeenCalled()
+        expect(onSelectEssay).toHaveBeenCalledWith({
+            id: 'one',
+            content: 'Published',
+        })
+
+        act(() => root.unmount())
+        container.remove()
+    })
+
+    it('loads the next page when scrolling near the bottom', () => {
+        const container = document.body.appendChild(document.createElement('div'))
+        const root = createRoot(container)
+        const onLoadMore = vi.fn()
+        act(() =>
+            root.render(
+                <SidebarEssayList
+                    activeDocumentId="local:draft-one"
+                    drafts={[
+                        {
+                            localId: 'draft-one',
+                            content: '',
+                            createdAt: 1,
+                            updatedAt: 1,
+                        },
+                    ]}
+                    entries={[{id: 'one', content: 'Published'}]}
+                    error={null}
+                    hasMore
+                    loading={false}
+                    loadingMore={false}
+                    moreError={null}
+                    onCreateDraft={vi.fn()}
+                    onLoadMore={onLoadMore}
+                    onRefresh={vi.fn()}
+                    onRetry={vi.fn()}
+                    onSelectDraft={vi.fn()}
+                    onSelectEssay={vi.fn()}
+                    refreshDisabled={false}
+                    refreshing={false}
+                    selectedDate={null}
+                />
+            )
+        )
+
+        const region = container.querySelector(
+            '.sidebar-list-region'
+        ) as HTMLDivElement
+        Object.defineProperties(region, {
+            clientHeight: {configurable: true, value: 300},
+            scrollHeight: {configurable: true, value: 1000},
+            scrollTop: {configurable: true, writable: true, value: 500},
+        })
+
+        act(() => region.dispatchEvent(new Event('scroll', {bubbles: true})))
+        expect(onLoadMore).not.toHaveBeenCalled()
+
+        region.scrollTop = 590
+        act(() => region.dispatchEvent(new Event('scroll', {bubbles: true})))
+        expect(onLoadMore).toHaveBeenCalledTimes(1)
 
         act(() => root.unmount())
         container.remove()

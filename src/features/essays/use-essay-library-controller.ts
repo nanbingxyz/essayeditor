@@ -38,18 +38,25 @@ export function useEssayLibraryController({
     const [loadingMore, setLoadingMore] = useState(false)
     const [moreError, setMoreError] = useState<string | null>(null)
     const [page, setPage] = useState(0)
+    const [refreshing, setRefreshing] = useState(false)
     const [refreshVersion, setRefreshVersion] = useState(0)
     const abortRef = useRef<AbortController>()
+    const entriesRef = useRef<EssayListEntry[]>([])
     const generationRef = useRef(0)
     const onErrorRef = useRef(onError)
     const hasMoreRef = useRef(false)
     const loadingMoreRef = useRef(false)
     const pageRef = useRef(0)
+    const queryKeyRef = useRef<string | null>(null)
+    const refreshRequestedRef = useRef(false)
+    const refreshingRef = useRef(false)
 
     onErrorRef.current = onError
+    entriesRef.current = entries
     hasMoreRef.current = hasMore
     loadingMoreRef.current = loadingMore
     pageRef.current = page
+    refreshingRef.current = refreshing
 
     const hydrateEntries = useCallback(
         async (essays: EssayListItem[]) =>
@@ -72,6 +79,14 @@ export function useEssayLibraryController({
     useEffect(() => {
         abortRef.current?.abort()
         const generation = ++generationRef.current
+        const queryKey = enabled
+            ? JSON.stringify([accessToken, date, userId])
+            : null
+        const isRefresh =
+            refreshRequestedRef.current && queryKeyRef.current === queryKey
+        const hadEntries = entriesRef.current.length > 0
+        refreshRequestedRef.current = false
+        queryKeyRef.current = queryKey
 
         if (!enabled || !accessToken || !userId) {
             setEntries([])
@@ -81,18 +96,25 @@ export function useEssayLibraryController({
             setLoadingMore(false)
             setMoreError(null)
             setPage(0)
+            setRefreshing(false)
             return
         }
 
         const abortController = new AbortController()
         abortRef.current = abortController
-        setEntries([])
         setError(null)
         setHasMore(false)
-        setLoading(true)
         setLoadingMore(false)
         setMoreError(null)
         setPage(0)
+        if (isRefresh) {
+            setLoading(false)
+            setRefreshing(true)
+        } else {
+            setEntries([])
+            setLoading(true)
+            setRefreshing(false)
+        }
 
         void client
             .list({
@@ -102,8 +124,13 @@ export function useEssayLibraryController({
                 signal: abortController.signal,
                 userId,
             })
-            .then(hydrateEntries)
-            .then((nextEntries) => {
+            .then(async (nextEntries) => ({
+                entries: await hydrateEntries(
+                    nextEntries.slice(0, PAGE_SIZE)
+                ),
+                hasMore: nextEntries.length > PAGE_SIZE,
+            }))
+            .then(({entries: nextEntries, hasMore: nextHasMore}) => {
                 if (
                     abortController.signal.aborted ||
                     generation !== generationRef.current
@@ -111,9 +138,10 @@ export function useEssayLibraryController({
                     return
                 }
                 setEntries(nextEntries)
-                setHasMore(nextEntries.length === PAGE_SIZE)
+                setHasMore(nextHasMore)
                 setPage(1)
                 setLoading(false)
+                setRefreshing(false)
             })
             .catch((requestError: unknown) => {
                 if (
@@ -126,8 +154,9 @@ export function useEssayLibraryController({
                     requestError instanceof Error
                         ? requestError.message
                         : '无法加载文章，请稍后重试'
-                setError(message)
+                setError(isRefresh && hadEntries ? null : message)
                 setLoading(false)
+                setRefreshing(false)
                 onErrorRef.current(message)
             })
 
@@ -147,6 +176,7 @@ export function useEssayLibraryController({
             !enabled ||
             !hasMoreRef.current ||
             loadingMoreRef.current ||
+            refreshingRef.current ||
             !accessToken ||
             !userId
         ) {
@@ -162,14 +192,15 @@ export function useEssayLibraryController({
         abortRef.current = abortController
 
         try {
+            const responseEntries = await client.list({
+                accessToken,
+                date,
+                page: nextPage,
+                signal: abortController.signal,
+                userId,
+            })
             const nextEntries = await hydrateEntries(
-                await client.list({
-                    accessToken,
-                    date,
-                    page: nextPage,
-                    signal: abortController.signal,
-                    userId,
-                })
+                responseEntries.slice(0, PAGE_SIZE)
             )
             if (
                 abortController.signal.aborted ||
@@ -177,14 +208,14 @@ export function useEssayLibraryController({
             ) {
                 return
             }
-            setEntries((current) => {
-                const existingIds = new Set(current.map(({id}) => id))
-                return [
-                    ...current,
-                    ...nextEntries.filter(({id}) => !existingIds.has(id)),
-                ]
-            })
-            setHasMore(nextEntries.length === PAGE_SIZE)
+            const existingIds = new Set(
+                entriesRef.current.map(({id}) => id)
+            )
+            const uniqueNextEntries = nextEntries.filter(
+                ({id}) => !existingIds.has(id)
+            )
+            setEntries((current) => [...current, ...uniqueNextEntries])
+            setHasMore(responseEntries.length > PAGE_SIZE)
             setPage(nextPage)
         } catch (requestError) {
             if (
@@ -207,8 +238,19 @@ export function useEssayLibraryController({
     }, [accessToken, client, date, enabled, hydrateEntries, userId])
 
     const refresh = useCallback(() => {
+        if (
+            !enabled ||
+            !accessToken ||
+            !userId ||
+            refreshingRef.current
+        ) {
+            return
+        }
+        refreshRequestedRef.current = true
+        refreshingRef.current = true
+        setRefreshing(true)
         setRefreshVersion((version) => version + 1)
-    }, [])
+    }, [accessToken, enabled, userId])
 
     const retry = useCallback(() => {
         if (entries.length === 0) {
@@ -244,7 +286,15 @@ export function useEssayLibraryController({
         )
     }, [])
 
+    const commitPublish = useCallback((essayId: string, content: string) => {
+        setEntries((current) => [
+            {id: essayId, content},
+            ...current.filter((entry) => entry.id !== essayId),
+        ])
+    }, [])
+
     return {
+        commitPublish,
         commitUpdate,
         entries,
         error,
@@ -254,6 +304,7 @@ export function useEssayLibraryController({
         loadingMore,
         moreError,
         refresh,
+        refreshing,
         retry,
         setLocalContent,
     }
