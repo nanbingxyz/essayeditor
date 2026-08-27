@@ -13,6 +13,7 @@
         "windows": [
             {
                 "title": "Essay",
+                "visible": false,
                 "width": 800,
                 "height": 600,
                 "minWidth": 400,

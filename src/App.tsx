@@ -204,6 +204,12 @@ function App() {
     }
 
     useEffect(() => {
+        void getCurrentWindow().show().catch((error) => {
+            console.error('Failed to show the main window', error)
+        })
+    }, [])
+
+    useEffect(() => {
         let cancelled = false
 
         const initializeStore = async () => {
