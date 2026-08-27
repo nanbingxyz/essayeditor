@@ -56,7 +56,7 @@ function renderController(
 
 function snapshot(name: string, count: number): EssayActivitySnapshot {
     return {
-        user: {avatar: `${name}-avatar`, displayName: name},
+        user: {id: name, avatar: `${name}-avatar`, displayName: name},
         heatmap: {'2026-08-27': count},
     }
 }

@@ -12,9 +12,16 @@ import {
 import {
     createDraftRepository,
     EditorPage,
+    NEW_DRAFT_KEY,
     type MarkdownEditorHandle,
     useDraftController,
 } from '@/features/editor'
+import {
+    createEssayLibraryClient,
+    type EssayListEntry,
+    SidebarEssayList,
+    useEssayLibraryController,
+} from '@/features/essays'
 import {
     AppShell,
     type AppPage,
@@ -34,10 +41,19 @@ import {tauriDesktopAdapter} from '@/shared/platform/desktop'
 
 import {essayApiBaseUrl} from './essay-api-config'
 
+type ActiveDocument =
+    | {kind: 'new'}
+    | {kind: 'published'; content: string; id: string}
+
 export default function App() {
     const {toast} = useToast()
     const [page, setPage] = useState<AppPage>('editor')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [activeDocument, setActiveDocument] = useState<ActiveDocument>({
+        kind: 'new',
+    })
+    const [newDraftContent, setNewDraftContent] = useState('')
+    const [updating, setUpdating] = useState(false)
     const editorRef = useRef<MarkdownEditorHandle>(null)
 
     const settingsRepository = useMemo(createSettingsRepository, [])
@@ -48,6 +64,10 @@ export default function App() {
     )
     const essayActivityClient = useMemo(
         () => createEssayActivityClient({baseUrl: essayApiBaseUrl}),
+        []
+    )
+    const essayLibraryClient = useMemo(
+        () => createEssayLibraryClient({baseUrl: essayApiBaseUrl}),
         []
     )
 
@@ -81,6 +101,14 @@ export default function App() {
         onLoadError: notifySettingsLoadError,
     })
     const draft = useDraftController({
+        baselineContent:
+            activeDocument.kind === 'published'
+                ? activeDocument.content
+                : '',
+        documentKey:
+            activeDocument.kind === 'published'
+                ? `essay:${activeDocument.id}`
+                : NEW_DRAFT_KEY,
         repository: draftRepository,
         onError: notifyDraftError,
     })
@@ -102,6 +130,28 @@ export default function App() {
         onError: notifyActivityError,
     })
 
+    const notifyEssayListError = useCallback(
+        (message: string) => {
+            toast({
+                title: '无法加载个人文章',
+                description: message,
+                variant: 'destructive',
+            })
+        },
+        [toast]
+    )
+    const library = useEssayLibraryController({
+        accessToken: settings.accessToken,
+        client: essayLibraryClient,
+        date: selectedDate,
+        draftRepository,
+        enabled: Boolean(
+            settings.ready && settings.accessToken && activity.user?.id
+        ),
+        onError: notifyEssayListError,
+        userId: activity.user?.id ?? '',
+    })
+
     const notifyPublishError = useCallback(
         (message: string) => {
             toast({
@@ -115,8 +165,11 @@ export default function App() {
 
     const handlePublishSuccess = useCallback(
         async (id: string) => {
-            editorRef.current?.setValue('')
             await draft.clear()
+            editorRef.current?.setValue('')
+            setNewDraftContent('')
+            library.refresh()
+            activity.refresh()
             toast({
                 title: '文章已发布',
                 description: '你可以点击右侧按钮查看新发布的文章',
@@ -134,7 +187,7 @@ export default function App() {
                 ),
             })
         },
-        [draft, toast]
+        [activity, draft, library, toast]
     )
 
     const publishing = usePublishingController({
@@ -150,6 +203,12 @@ export default function App() {
         page,
         onLayoutChange: requestEditorMeasure,
     })
+
+    useEffect(() => {
+        if (activeDocument.kind === 'new' && draft.ready) {
+            setNewDraftContent(draft.content)
+        }
+    }, [activeDocument.kind, draft.content, draft.ready])
 
     useEffect(() => {
         void tauriDesktopAdapter.showMainWindow().catch((error) => {
@@ -177,7 +236,7 @@ export default function App() {
         })
     }
 
-    const publish = async () => {
+    const saveDocument = async () => {
         if (!settings.accessToken) {
             openSettings()
             toast({
@@ -188,34 +247,192 @@ export default function App() {
             return
         }
 
-        await draft.flush()
-        const content = editorRef.current?.getValue() ?? ''
-        await publishing.publish(content, settings.accessToken)
+        const saved = await draft.flush()
+        if (!saved) {
+            return
+        }
+
+        const content = editorRef.current?.getValue() ?? draft.content
+        if (activeDocument.kind === 'new') {
+            await publishing.publish(content, settings.accessToken)
+            return
+        }
+        if (content === activeDocument.content) {
+            return
+        }
+
+        setUpdating(true)
+        try {
+            await essayLibraryClient.update(
+                activeDocument.id,
+                content,
+                settings.accessToken
+            )
+            await draft.clear()
+            library.commitUpdate(activeDocument.id, content)
+            setActiveDocument({
+                kind: 'published',
+                id: activeDocument.id,
+                content,
+            })
+            toast({title: '文章已更新'})
+        } catch (error) {
+            toast({
+                title: '更新失败',
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : '请稍后重试',
+                variant: 'destructive',
+            })
+        } finally {
+            setUpdating(false)
+        }
     }
+
+    const showEditor = () => {
+        setPage('editor')
+        if (layout.isNarrow) {
+            layout.closeMobileSidebar()
+        }
+        requestAnimationFrame(() => editorRef.current?.focus())
+    }
+
+    const selectNewDocument = async () => {
+        if (activeDocument.kind === 'new') {
+            showEditor()
+            return
+        }
+        if (!(await draft.flush())) {
+            return
+        }
+        setActiveDocument({kind: 'new'})
+        showEditor()
+    }
+
+    const selectEssay = async (essay: EssayListEntry) => {
+        if (
+            activeDocument.kind === 'published' &&
+            activeDocument.id === essay.id
+        ) {
+            showEditor()
+            return
+        }
+        if (!(await draft.flush())) {
+            return
+        }
+        setActiveDocument({
+            kind: 'published',
+            id: essay.id,
+            content: essay.content,
+        })
+        showEditor()
+    }
+
+    const changeSelectedDate = async (date: string | null) => {
+        if (!(await draft.flush())) {
+            return
+        }
+        setSelectedDate(date)
+    }
+
+    const handleContentChange = (content: string) => {
+        draft.onContentChange(content)
+        if (activeDocument.kind === 'new') {
+            setNewDraftContent(content)
+            return
+        }
+        library.setLocalContent(
+            activeDocument.id,
+            content === activeDocument.content ? null : content
+        )
+    }
+
+    const documentStatus =
+        activeDocument.kind === 'new'
+            ? 'draft'
+            : draft.content === activeDocument.content
+              ? 'published'
+              : 'modified'
+    const editorStatusLabel =
+        documentStatus === 'draft'
+            ? '未发布（草稿）'
+            : documentStatus === 'published'
+              ? '已发布'
+              : '已发布（在本地有更改）'
+    const actionLabel =
+        documentStatus === 'modified' ? '更新文章' : '发布文章'
+    const listWaitingForUser = Boolean(
+        settings.ready &&
+            settings.accessToken &&
+            !activity.user?.id &&
+            activity.loading
+    )
+    const listError =
+        settings.accessToken && activity.error ? activity.error : library.error
 
     return (
         <AppShell
             accountError={activity.error !== null}
             accountLoading={activity.loading}
             articleCounts={activity.heatmap}
+            editorStatusLabel={editorStatusLabel}
             hasAccessToken={Boolean(settings.accessToken)}
             layout={layout}
             onOpenSettings={openSettings}
-            onSelectedDateChange={setSelectedDate}
+            onSelectedDateChange={(date) => void changeSelectedDate(date)}
             page={page}
             selectedDate={selectedDate}
+            sidebarContent={
+                <SidebarEssayList
+                    activeEssayId={
+                        activeDocument.kind === 'published'
+                            ? activeDocument.id
+                            : null
+                    }
+                    activeIsNew={activeDocument.kind === 'new'}
+                    entries={library.entries}
+                    error={listError}
+                    hasMore={library.hasMore}
+                    loading={
+                        !settings.ready ||
+                        listWaitingForUser ||
+                        library.loading
+                    }
+                    loadingMore={library.loadingMore}
+                    moreError={library.moreError}
+                    newDraftContent={newDraftContent}
+                    onLoadMore={() => void library.loadMore()}
+                    onRetry={
+                        activity.error ? activity.refresh : library.retry
+                    }
+                    onSelectEssay={(essay) => void selectEssay(essay)}
+                    onSelectNew={() => void selectNewDocument()}
+                    selectedDate={selectedDate}
+                />
+            }
             storeReady={settings.ready}
             user={activity.user}
         >
             <EditorPage
                 ref={editorRef}
                 active={page === 'editor'}
+                actionLabel={actionLabel}
                 backupTimestamp={draft.updatedAt}
+                editorKey={
+                    activeDocument.kind === 'published'
+                        ? `essay:${activeDocument.id}`
+                        : NEW_DRAFT_KEY
+                }
                 initialContent={draft.initialContent}
-                loading={publishing.loading}
-                onContentChange={draft.onContentChange}
-                onPublish={() => void publish()}
-                publishReady={draft.ready && settings.ready}
+                loading={publishing.loading || updating}
+                onContentChange={handleContentChange}
+                onPublish={() => void saveDocument()}
+                publishReady={
+                    draft.ready &&
+                    settings.ready &&
+                    documentStatus !== 'published'
+                }
                 ready={draft.ready}
             />
             <div

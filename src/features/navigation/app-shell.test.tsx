@@ -43,11 +43,13 @@ function renderShell(initialState: AccountState) {
             <AppShell
                 {...state}
                 articleCounts={{}}
+                editorStatusLabel="未发布（草稿）"
                 layout={layout}
                 onOpenSettings={vi.fn()}
                 onSelectedDateChange={vi.fn()}
                 page="editor"
                 selectedDate={null}
+                sidebarContent={<div>Article list</div>}
             >
                 <div>Editor</div>
             </AppShell>

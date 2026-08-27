@@ -48,11 +48,19 @@ function readUser(value: unknown): EssayUser | null {
         return null
     }
 
-    const {avatar, displayName} = value as {
+    const {id, avatar, displayName} = value as {
+        id?: unknown
         avatar?: unknown
         displayName?: unknown
     }
+    const normalizedId =
+        typeof id === 'string' && id.trim()
+            ? id.trim()
+            : typeof id === 'number' && Number.isFinite(id)
+              ? String(id)
+              : null
     if (
+        !normalizedId ||
         typeof avatar !== 'string' ||
         !avatar.trim() ||
         typeof displayName !== 'string' ||
@@ -62,6 +70,7 @@ function readUser(value: unknown): EssayUser | null {
     }
 
     return {
+        id: normalizedId,
         avatar: avatar.trim(),
         displayName: displayName.trim(),
     }

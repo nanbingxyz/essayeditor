@@ -1,4 +1,4 @@
-export {createDraftRepository} from './draft-repository'
+export {createDraftRepository, NEW_DRAFT_KEY} from './draft-repository'
 export type {DraftRepository, DraftSnapshot} from './draft-repository'
 export {default as EditorPage} from './editor-page'
 export {useDraftController} from './use-draft-controller'

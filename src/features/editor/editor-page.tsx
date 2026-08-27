@@ -8,7 +8,9 @@ import MarkdownEditor, {type MarkdownEditorHandle} from './markdown-editor'
 
 interface EditorPageProps {
     active: boolean
+    actionLabel: string
     backupTimestamp: number
+    editorKey: string
     initialContent: string
     loading: boolean
     onContentChange: (content: string) => void
@@ -21,7 +23,9 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
     (
         {
             active,
+            actionLabel,
             backupTimestamp,
+            editorKey,
             initialContent,
             loading,
             onContentChange,
@@ -34,6 +38,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
         <div className={`editor-page ${active ? '' : 'is-page-hidden'}`}>
             {ready ? (
                 <MarkdownEditor
+                    key={editorKey}
                     ref={ref}
                     initialValue={initialContent}
                     disabled={loading}
@@ -58,8 +63,8 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
                     type="button"
                     size="icon"
                     className="publish-button"
-                    aria-label="发布文章"
-                    title="发布"
+                    aria-label={actionLabel}
+                    title={actionLabel === '更新文章' ? '更新' : '发布'}
                     disabled={loading || !publishReady}
                     onClick={onPublish}
                 >

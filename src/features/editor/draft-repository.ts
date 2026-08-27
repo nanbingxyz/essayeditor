@@ -6,6 +6,9 @@ import {
 const DRAFT_STORE_PATH = 'drafts.bin'
 const CURRENT_DRAFT_KEY = 'currentDraft'
 const LEGACY_BACKUP_KEY = 'backup'
+const DRAFT_KEY_PREFIX = 'draft:'
+
+export const NEW_DRAFT_KEY = 'new'
 
 export interface DraftSnapshot {
     version: 1
@@ -14,9 +17,9 @@ export interface DraftSnapshot {
 }
 
 export interface DraftRepository {
-    clear: () => Promise<void>
-    load: () => Promise<DraftSnapshot | null>
-    save: (draft: DraftSnapshot) => Promise<void>
+    clear: (documentKey: string) => Promise<void>
+    load: (documentKey: string) => Promise<DraftSnapshot | null>
+    save: (documentKey: string, draft: DraftSnapshot) => Promise<void>
 }
 
 export interface LegacyStorage {
@@ -91,28 +94,49 @@ export function createDraftRepository({
         return storePromise
     }
 
-    const save = async (draft: DraftSnapshot) => {
+    const getDraftStoreKey = (documentKey: string) =>
+        `${DRAFT_KEY_PREFIX}${documentKey}`
+
+    const save = async (documentKey: string, draft: DraftSnapshot) => {
         const store = await getStore()
-        await store.set(CURRENT_DRAFT_KEY, draft)
+        await store.set(getDraftStoreKey(documentKey), draft)
         await store.save()
     }
 
     return {
-        clear: async () => {
+        clear: async (documentKey) => {
             const store = await getStore()
-            await store.delete(CURRENT_DRAFT_KEY)
+            await store.delete(getDraftStoreKey(documentKey))
             await store.save()
         },
-        load: async () => {
+        load: async (documentKey) => {
             try {
                 const store = await getStore()
                 const storedDraft = parseDraftSnapshot(
-                    await store.get<unknown>(CURRENT_DRAFT_KEY)
+                    await store.get<unknown>(getDraftStoreKey(documentKey))
                 )
                 if (storedDraft) {
                     return storedDraft
                 }
+
+                if (documentKey === NEW_DRAFT_KEY) {
+                    const oldCurrentDraft = parseDraftSnapshot(
+                        await store.get<unknown>(CURRENT_DRAFT_KEY)
+                    )
+                    if (oldCurrentDraft) {
+                        await store.set(
+                            getDraftStoreKey(NEW_DRAFT_KEY),
+                            oldCurrentDraft
+                        )
+                        await store.delete(CURRENT_DRAFT_KEY)
+                        await store.save()
+                        return oldCurrentDraft
+                    }
+                }
             } catch {
+                if (documentKey !== NEW_DRAFT_KEY) {
+                    throw new Error('Unable to load the draft store')
+                }
                 const legacyDraft = parseLegacyBackup(
                     legacyStorage.getItem(LEGACY_BACKUP_KEY)
                 )
@@ -120,6 +144,10 @@ export function createDraftRepository({
                     return legacyDraft
                 }
                 throw new Error('Unable to load the draft store')
+            }
+
+            if (documentKey !== NEW_DRAFT_KEY) {
+                return null
             }
 
             const legacyDraft = parseLegacyBackup(
@@ -130,7 +158,7 @@ export function createDraftRepository({
             }
 
             try {
-                await save(legacyDraft)
+                await save(NEW_DRAFT_KEY, legacyDraft)
                 legacyStorage.removeItem(LEGACY_BACKUP_KEY)
             } catch {
                 // Keep the legacy backup until a future migration succeeds.

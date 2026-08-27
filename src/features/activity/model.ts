@@ -1,4 +1,5 @@
 export interface EssayUser {
+    id: string
     avatar: string
     displayName: string
 }

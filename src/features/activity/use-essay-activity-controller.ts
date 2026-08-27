@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 
 import type {EssayActivityClient} from './essay-activity-client'
 import type {EssayUser, Heatmap} from './model'
@@ -20,6 +20,7 @@ export function useEssayActivityController({
     const [heatmap, setHeatmap] = useState<Heatmap>({})
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [refreshVersion, setRefreshVersion] = useState(0)
     const onErrorRef = useRef(onError)
 
     onErrorRef.current = onError
@@ -69,12 +70,17 @@ export function useEssayActivityController({
             })
 
         return () => abortController.abort()
-    }, [accessToken, client, enabled])
+    }, [accessToken, client, enabled, refreshVersion])
+
+    const refresh = useCallback(() => {
+        setRefreshVersion((version) => version + 1)
+    }, [])
 
     return {
         error,
         heatmap,
         loading,
+        refresh,
         user,
     }
 }

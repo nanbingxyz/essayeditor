@@ -97,6 +97,148 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     overflow-y: auto;
 }
 
+.essay-index {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 8px 14px;
+}
+
+.essay-index-item {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-height: 52px;
+    min-width: 0;
+    align-items: center;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+}
+
+.essay-index-item:hover {
+    background: hsl(var(--accent) / 0.58);
+}
+
+.essay-index-item:focus-visible {
+    outline: 1px solid hsl(var(--ring));
+    outline-offset: 1px;
+}
+
+.essay-index-item.is-active {
+    background: hsl(var(--accent));
+}
+
+.essay-new-item {
+    min-height: 40px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.essay-index-label {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.essay-index-preview {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    color: hsl(var(--foreground) / 0.84);
+    font-family: 'Noto Serif SC Variable', serif;
+    font-size: 12px;
+    line-height: 18px;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.essay-new-item .essay-index-preview {
+    margin-top: 2px;
+    color: hsl(var(--muted-foreground));
+    font-family: inherit;
+    -webkit-line-clamp: 1;
+}
+
+.essay-modified-marker {
+    position: absolute;
+    top: 9px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 0 2px hsl(var(--sidebar-background));
+}
+
+.essay-list-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.essay-list-skeleton-item {
+    display: flex;
+    height: 52px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding: 7px 10px;
+}
+
+.essay-list-skeleton-item span {
+    height: 9px;
+    border-radius: 999px;
+    background: hsl(var(--muted-foreground) / 0.14);
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+.essay-list-skeleton-item span:first-child {
+    width: 88%;
+}
+
+.essay-list-skeleton-item span:last-child {
+    width: 62%;
+}
+
+.essay-list-message {
+    display: flex;
+    min-height: 86px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    text-align: center;
+}
+
+.essay-list-message.is-compact {
+    min-height: 38px;
+    padding: 4px;
+}
+
+.essay-list-message button {
+    padding: 3px 8px;
+    border: 0;
+    border-radius: 5px;
+    color: hsl(var(--foreground));
+    background: hsl(var(--accent));
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.essay-list-sentinel {
+    height: 1px;
+}
+
 .sidebar-calendar {
     width: 100%;
     min-width: 0;

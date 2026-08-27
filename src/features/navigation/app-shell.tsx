@@ -44,12 +44,14 @@ interface AppShellProps {
     accountLoading: boolean
     articleCounts: ArticleCountByDate
     children: ReactNode
+    editorStatusLabel: string
     hasAccessToken: boolean
     layout: SidebarLayout
     onOpenSettings: () => void
     onSelectedDateChange: (date: string | null) => void
     page: AppPage
     selectedDate: string | null
+    sidebarContent: ReactNode
     storeReady: boolean
     user: SidebarAccountUser | null
 }
@@ -89,12 +91,14 @@ export default function AppShell({
     accountLoading,
     articleCounts,
     children,
+    editorStatusLabel,
     hasAccessToken,
     layout,
     onOpenSettings,
     onSelectedDateChange,
     page,
     selectedDate,
+    sidebarContent,
     storeReady,
     user,
 }: AppShellProps) {
@@ -155,7 +159,7 @@ export default function AppShell({
                     onDateSelect={onSelectedDateChange}
                 />
 
-                <div className="sidebar-list-region" />
+                {sidebarContent}
 
                 <footer className="sidebar-footer">
                     <div className="sidebar-account-slot">
@@ -227,7 +231,7 @@ export default function AppShell({
                             data-tauri-drag-region
                             className="editor-toolbar-title"
                         >
-                            <span>新文章</span>
+                            <span>{editorStatusLabel}</span>
                         </div>
                     )}
                     {layout.rightSidebarAvailable && (

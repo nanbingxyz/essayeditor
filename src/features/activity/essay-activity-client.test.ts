@@ -15,6 +15,7 @@ describe('EssayActivityClient', () => {
             response(
                 JSON.stringify({
                     user: {
+                        id: 42,
                         avatar: 'https://example.com/avatar.png',
                         displayName: 'Essay User',
                     },
@@ -33,6 +34,7 @@ describe('EssayActivityClient', () => {
 
         await expect(client.getHeatmap('token', signal)).resolves.toEqual({
             user: {
+                id: '42',
                 avatar: 'https://example.com/avatar.png',
                 displayName: 'Essay User',
             },
@@ -77,11 +79,11 @@ describe('EssayActivityClient', () => {
             'not-json',
             JSON.stringify({user: {}, heatmap: {}}),
             JSON.stringify({
-                user: {avatar: 'avatar', displayName: 'User'},
+                user: {id: 'user', avatar: 'avatar', displayName: 'User'},
                 heatmap: {'August 27': 1},
             }),
             JSON.stringify({
-                user: {avatar: 'avatar', displayName: 'User'},
+                user: {id: 'user', avatar: 'avatar', displayName: 'User'},
                 heatmap: {'2026-08-27': -1},
             }),
         ]
