@@ -356,7 +356,7 @@ export default function App() {
               : 'modified'
     const editorStatusLabel =
         documentStatus === 'draft'
-            ? '未发布（草稿）'
+            ? '草稿'
             : documentStatus === 'published'
               ? '已发布'
               : '已发布（在本地有更改）'

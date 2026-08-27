@@ -203,7 +203,6 @@
 .backup-status {
     color: hsl(var(--muted-foreground));
     font-size: 12px;
-    font-weight: 600;
 }
 
 .publish-button {

@@ -81,7 +81,6 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     gap: 9px;
     padding: 0 4px;
     font-size: 14px;
-    font-weight: 600;
     line-height: 1;
 }
 
@@ -112,13 +111,12 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     min-height: 52px;
     min-width: 0;
     align-items: center;
-    padding: 7px 10px;
-    border: 0;
-    border-radius: 7px;
+    padding: 10px;
     color: inherit;
     background: transparent;
     cursor: pointer;
     text-align: left;
+    border-radius: 8px;
 }
 
 .essay-index-item:hover {
@@ -142,8 +140,9 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
 }
 
 .essay-index-label {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 400;
+    color: hsl(var(--muted-foreground));
 }
 
 .essay-index-preview {
@@ -151,7 +150,6 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     min-width: 0;
     overflow: hidden;
     color: hsl(var(--foreground) / 0.84);
-    font-family: 'Noto Serif SC Variable', serif;
     font-size: 12px;
     line-height: 18px;
     overflow-wrap: anywhere;

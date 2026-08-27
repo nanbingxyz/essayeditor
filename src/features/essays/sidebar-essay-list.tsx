@@ -117,7 +117,7 @@ export default function SidebarEssayList({
                     aria-current={activeIsNew ? 'page' : undefined}
                     onClick={onSelectNew}
                 >
-                    <span className="essay-index-label">新文章</span>
+                    <span className="essay-index-label">草稿</span>
                     {newDraftContent.trim() && (
                         <span className="essay-index-preview">
                             {markdownToSummary(newDraftContent)}

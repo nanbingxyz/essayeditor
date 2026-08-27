@@ -1,6 +1,6 @@
-import {PaperPlaneIcon, ShadowInnerIcon} from '@radix-ui/react-icons'
+import { ShadowInnerIcon} from '@radix-ui/react-icons'
+import {Send20Filled} from '@fluentui/react-icons'
 import {forwardRef} from 'react'
-
 import {Button} from '@/shared/ui'
 import {getRelativeTime} from '@/shared/lib/timing'
 
@@ -62,7 +62,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
                 <Button
                     type="button"
                     size="icon"
-                    className="publish-button"
+                    className="publish-button rounded-full"
                     aria-label={actionLabel}
                     title={actionLabel === '更新文章' ? '更新' : '发布'}
                     disabled={loading || !publishReady}
@@ -71,7 +71,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
                     {loading ? (
                         <ShadowInnerIcon className="animate-spin" />
                     ) : (
-                        <PaperPlaneIcon />
+                        <Send20Filled  className='-rotate-[18deg] ml-0.5' />
                     )}
                 </Button>
             </footer>
