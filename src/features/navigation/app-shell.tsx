@@ -5,9 +5,9 @@ import {
     PanelRightExpand20Regular,
 } from '@fluentui/react-icons'
 import {GearIcon} from '@radix-ui/react-icons'
-import {type CSSProperties, type ReactNode, useState} from 'react'
+import {type CSSProperties, type ReactNode} from 'react'
 
-import {Button} from '@/shared/ui'
+import {Avatar, AvatarFallback, AvatarImage, Button} from '@/shared/ui'
 
 import SidebarCalendar, {type ArticleCountByDate} from './sidebar-calendar'
 import {
@@ -37,12 +37,11 @@ interface AppShellProps {
 }
 
 export interface SidebarAccountUser {
-    avatar: string
+    avatar: string | null
     displayName: string
 }
 
 function SidebarUser({user}: {user: SidebarAccountUser}) {
-    const [avatarFailed, setAvatarFailed] = useState(false)
     const fallbackLabel = user.displayName.trim().charAt(0).toUpperCase() || 'E'
 
     return (
@@ -50,17 +49,13 @@ function SidebarUser({user}: {user: SidebarAccountUser}) {
             className="sidebar-user"
             aria-label={`当前用户：${user.displayName}`}
         >
-            <span className="sidebar-user-avatar" aria-hidden="true">
-                {avatarFailed ? (
-                    <span>{fallbackLabel}</span>
-                ) : (
-                    <img
-                        src={user.avatar}
-                        alt=""
-                        onError={() => setAvatarFailed(true)}
-                    />
-                )}
-            </span>
+            <Avatar
+                className="sidebar-user-avatar size-[30px]"
+                aria-hidden="true"
+            >
+                {user.avatar ? <AvatarImage src={user.avatar} alt="" /> : null}
+                <AvatarFallback>{fallbackLabel}</AvatarFallback>
+            </Avatar>
             <span className="sidebar-user-name">{user.displayName}</span>
         </div>
     )
@@ -165,7 +160,10 @@ export default function AppShell({
                                 设置 API Key
                             </Button>
                         ) : user ? (
-                            <SidebarUser key={user.avatar} user={user} />
+                            <SidebarUser
+                                key={user.avatar ?? user.displayName}
+                                user={user}
+                            />
                         ) : (
                             <span className="sidebar-account-error">
                                 无法加载用户信息

@@ -61,8 +61,7 @@ function readUser(value: unknown): EssayUser | null {
               : null
     if (
         !normalizedId ||
-        typeof avatar !== 'string' ||
-        !avatar.trim() ||
+        (avatar != null && typeof avatar !== 'string') ||
         typeof displayName !== 'string' ||
         !displayName.trim()
     ) {
@@ -71,7 +70,7 @@ function readUser(value: unknown): EssayUser | null {
 
     return {
         id: normalizedId,
-        avatar: avatar.trim(),
+        avatar: typeof avatar === 'string' ? avatar.trim() || null : null,
         displayName: displayName.trim(),
     }
 }

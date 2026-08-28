@@ -53,6 +53,35 @@ describe('EssayActivityClient', () => {
         )
     })
 
+    it.each([null, '', '   ', undefined])(
+        'loads users without an avatar (%s)',
+        async (avatar) => {
+            const client = createEssayActivityClient({
+                baseUrl: 'https://api.essay.ink',
+                httpClient: async () =>
+                    response(
+                        JSON.stringify({
+                            user: {
+                                id: 'user',
+                                avatar,
+                                displayName: 'User',
+                            },
+                            heatmap: {'2026-08-27': 1},
+                        })
+                    ),
+            })
+
+            await expect(client.getHeatmap('token')).resolves.toEqual({
+                user: {
+                    id: 'user',
+                    avatar: null,
+                    displayName: 'User',
+                },
+                heatmap: {'2026-08-27': 1},
+            })
+        }
+    )
+
     it('preserves server errors and normalizes network failures', async () => {
         const serverErrorClient = createEssayActivityClient({
             baseUrl: 'https://api.essay.ink',
@@ -78,6 +107,10 @@ describe('EssayActivityClient', () => {
         const payloads = [
             'not-json',
             JSON.stringify({user: {}, heatmap: {}}),
+            JSON.stringify({
+                user: {id: 'user', avatar: 42, displayName: 'User'},
+                heatmap: {},
+            }),
             JSON.stringify({
                 user: {id: 'user', avatar: 'avatar', displayName: 'User'},
                 heatmap: {'August 27': 1},

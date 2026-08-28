@@ -1,6 +1,6 @@
 export interface EssayUser {
     id: string
-    avatar: string
+    avatar: string | null
     displayName: string
 }
 

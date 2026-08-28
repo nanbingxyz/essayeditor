@@ -69,6 +69,7 @@ function renderShell(initialState: AccountState) {
 afterEach(() => {
     roots.splice(0).forEach((root) => act(() => root.unmount()))
     document.body.replaceChildren()
+    vi.restoreAllMocks()
 })
 
 describe('AppShell account area', () => {
@@ -103,7 +104,14 @@ describe('AppShell account area', () => {
         expect(container.textContent).toContain('无法加载用户信息')
     })
 
-    it('shows the user avatar and falls back to the display-name initial', () => {
+    it('shows the user avatar', () => {
+        vi.spyOn(window, 'Image').mockImplementation(
+            () =>
+                ({
+                    complete: true,
+                    naturalWidth: 30,
+                }) as HTMLImageElement
+        )
         const {container} = renderShell({
             accountError: false,
             accountLoading: false,
@@ -120,7 +128,30 @@ describe('AppShell account area', () => {
         expect(image?.getAttribute('src')).toBe(
             'https://example.com/avatar.png'
         )
-        act(() => image?.dispatchEvent(new Event('error', {bubbles: true})))
+        expect(image?.classList.contains('size-full')).toBe(true)
+        expect(account?.textContent).toContain('Ben')
+    })
+
+    it('uses a same-size fallback when the user has no avatar', () => {
+        const {container} = renderShell({
+            accountError: false,
+            accountLoading: false,
+            hasAccessToken: true,
+            storeReady: true,
+            user: {
+                avatar: null,
+                displayName: 'Ben',
+            },
+        })
+        const account = container.querySelector('[aria-label="当前用户：Ben"]')
+        const avatar = account?.querySelector('[data-slot="avatar"]')
+        const fallback = avatar?.querySelector(
+            '[data-slot="avatar-fallback"]'
+        )
+
+        expect(account?.querySelector('img')).toBeNull()
+        expect(avatar?.classList.contains('size-[30px]')).toBe(true)
+        expect(fallback?.classList.contains('size-full')).toBe(true)
         expect(account?.textContent).toContain('B')
         expect(account?.textContent).toContain('Ben')
     })
