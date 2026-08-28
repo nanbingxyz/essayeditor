@@ -18,6 +18,7 @@ function localDraftMethods() {
             themeId: null,
             updatedAt: 1,
         })),
+        listOrCreateLocalDrafts: vi.fn(async () => []),
         listLocalDrafts: vi.fn(async () => []),
         removeLocalDraft: vi.fn(async () => undefined),
     }

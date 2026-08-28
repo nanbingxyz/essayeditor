@@ -98,6 +98,41 @@ describe('DraftRepository', () => {
         expect(await repository.listLocalDrafts()).toHaveLength(2)
     })
 
+    it('creates only one default draft during concurrent initialization', async () => {
+        const {store} = createStore()
+        const createId = vi.fn(() => 'default')
+        const repository = createDraftRepository({
+            createId,
+            loadStore: async () => store,
+            now: () => 10,
+        })
+
+        const [first, second] = await Promise.all([
+            repository.listOrCreateLocalDrafts(),
+            repository.listOrCreateLocalDrafts(),
+        ])
+
+        expect(first).toEqual(second)
+        expect(first).toHaveLength(1)
+        expect(createId).toHaveBeenCalledTimes(1)
+        expect(await repository.listLocalDrafts()).toHaveLength(1)
+    })
+
+    it('still allows manually creating drafts after initialization', async () => {
+        const {store} = createStore()
+        const ids = ['default', 'manual']
+        const repository = createDraftRepository({
+            createId: () => ids.shift()!,
+            loadStore: async () => store,
+            now: () => 10,
+        })
+
+        await repository.listOrCreateLocalDrafts()
+        await repository.createLocalDraft()
+
+        expect(await repository.listLocalDrafts()).toHaveLength(2)
+    })
+
     it('keeps published essay overrides isolated by document key', async () => {
         const {store} = createStore()
         const repository = createDraftRepository({

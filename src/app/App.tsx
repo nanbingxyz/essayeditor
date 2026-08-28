@@ -331,10 +331,7 @@ export default function App() {
         let cancelled = false
 
         void (async () => {
-            let drafts = await draftRepository.listLocalDrafts()
-            if (drafts.length === 0) {
-                drafts = [await draftRepository.createLocalDraft()]
-            }
+            const drafts = await draftRepository.listOrCreateLocalDrafts()
             if (cancelled) {
                 return
             }

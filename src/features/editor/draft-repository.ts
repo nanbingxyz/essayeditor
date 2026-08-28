@@ -31,6 +31,7 @@ interface LocalDraftCollection {
 export interface DraftRepository {
     clear: (documentKey: string) => Promise<void>
     createLocalDraft: (content?: string) => Promise<LocalDraft>
+    listOrCreateLocalDrafts: () => Promise<LocalDraft[]>
     listLocalDrafts: () => Promise<LocalDraft[]>
     load: (documentKey: string) => Promise<DraftSnapshot | null>
     removeLocalDraft: (localId: string) => Promise<void>
@@ -274,6 +275,27 @@ export function createDraftRepository({
                     drafts: [draft, ...collection.drafts],
                 })
                 return draft
+            }),
+        listOrCreateLocalDrafts: () =>
+            enqueueMutation(async () => {
+                const collection = await readLocalDrafts()
+                if (collection.drafts.length > 0) {
+                    return sortLocalDrafts(collection.drafts)
+                }
+
+                const timestamp = now()
+                const draft: LocalDraft = {
+                    localId: createId(),
+                    content: '',
+                    createdAt: timestamp,
+                    themeId: null,
+                    updatedAt: timestamp,
+                }
+                await writeLocalDrafts({
+                    version: 2,
+                    drafts: [draft],
+                })
+                return [draft]
             }),
         listLocalDrafts: async () => {
             await mutationQueue

@@ -1,3 +1,4 @@
+import {StrictMode} from 'react'
 import {createRoot, type Root} from 'react-dom/client'
 import {act} from 'react-dom/test-utils'
 import {afterEach, describe, expect, it, vi} from 'vitest'
@@ -67,6 +68,29 @@ afterEach(() => {
 })
 
 describe('App navigation', () => {
+    it('persists only one default draft when StrictMode repeats startup effects', async () => {
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(
+                <StrictMode>
+                    <App />
+                </StrictMode>
+            )
+            await settle()
+        })
+
+        const collection = storeFiles
+            .get('drafts.bin')
+            ?.get('localDrafts') as {drafts: unknown[]}
+        expect(collection.drafts).toHaveLength(1)
+        expect(container.querySelectorAll('.essay-new-item')).toHaveLength(1)
+    })
+
     it('moves between the editor and settings without a router', async () => {
         Object.defineProperty(window, 'innerWidth', {
             configurable: true,
