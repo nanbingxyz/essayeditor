@@ -52,7 +52,7 @@ export default function SettingsPage({
                 </Button>
                 <div>
                     <h1>设置</h1>
-                    <p>管理 EssayEditor 的本地设置</p>
+                    <p>Essay Editor 的本地设置</p>
                 </div>
             </header>
 
@@ -66,7 +66,6 @@ export default function SettingsPage({
                     </Label>
                     <p>
                         在 Essay 个人设置的“API 设置”中启用 API 并获取 API Key。
-                        输入内容会自动保存在当前设备。
                     </p>
                 </div>
 
