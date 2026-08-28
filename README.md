@@ -14,3 +14,5 @@ EssayEditor 通过 Essay API 发布内容，需要先在 [Essay](https://www.ess
 ## 开发
 
 前端采用按业务能力划分的 Feature 架构。目录边界、依赖方向、持久化约定和新增功能流程见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
+
+Windows 和 macOS 的跨仓库打包、签名、公证与在线更新发布流程见 [发布手册](./docs/release.md)。

@@ -1,0 +1,308 @@
+name: Publish Essay
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '11.11.0'
+  RELEASE_REPOSITORY: nanbingxyz/essayeditor-releases
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate stable tag and application versions
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          const tag = process.env.RELEASE_TAG
+          if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
+              throw new Error(`release tag must match vX.Y.Z, received ${tag}`)
+          }
+
+          const packageVersion = JSON.parse(
+              fs.readFileSync('package.json', 'utf8')
+          ).version
+          const tauriVersion = JSON.parse(
+              fs.readFileSync('src-tauri/tauri.conf.json', 'utf8')
+          ).version
+          const cargoToml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8')
+          const cargoVersion = cargoToml.match(
+              /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/m
+          )?.[1]
+          const expectedVersion = tag.slice(1)
+          const versions = {
+              'package.json': packageVersion,
+              'src-tauri/Cargo.toml': cargoVersion,
+              'src-tauri/tauri.conf.json': tauriVersion,
+          }
+
+          for (const [file, version] of Object.entries(versions)) {
+              if (version !== expectedVersion) {
+                  throw new Error(
+                      `${file} version ${version} does not match ${expectedVersion}`
+                  )
+              }
+          }
+          NODE
+
+      - name: Run frontend tests
+        run: pnpm test
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  publish:
+    name: Build ${{ matrix.name }}
+    needs: verify
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            platform: windows-latest
+            args: --bundles nsis
+            rust_target: ''
+            is_macos: false
+          - name: macOS Apple Silicon
+            platform: macos-latest
+            args: --target aarch64-apple-darwin --bundles app,dmg
+            rust_target: aarch64-apple-darwin
+            is_macos: true
+          - name: macOS Intel
+            platform: macos-latest
+            args: --target x86_64-apple-darwin --bundles app,dmg
+            rust_target: x86_64-apple-darwin
+            is_macos: true
+
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate publishing secrets
+        shell: bash
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          for name in RELEASE_TOKEN TAURI_SIGNING_PRIVATE_KEY; do
+              if [ -z "${!name}" ]; then
+                  echo "Missing required Actions secret: ${name}" >&2
+                  exit 1
+              fi
+          done
+
+      - name: Validate Apple signing and notarization secrets
+        if: matrix.is_macos
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+              if [ -z "${!name}" ]; then
+                  echo "Missing required Actions secret: ${name}" >&2
+                  exit 1
+              fi
+          done
+
+      - name: Build, sign, notarize and upload draft assets
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ matrix.is_macos && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.is_macos && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.is_macos && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.is_macos && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.is_macos && secrets.APPLE_TEAM_ID || '' }}
+        with:
+          owner: nanbingxyz
+          repo: essayeditor-releases
+          releaseCommitish: main
+          tagName: ${{ github.ref_name }}
+          releaseName: Essay ${{ github.ref_name }}
+          releaseBody: Installers and signed updater artifacts for Essay ${{ github.ref_name }}.
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          retryAttempts: 3
+          args: ${{ matrix.args }}
+
+      - name: Verify macOS signature, Gatekeeper and notarization ticket
+        if: matrix.is_macos
+        shell: bash
+        env:
+          MACOS_TARGET: ${{ matrix.rust_target }}
+        run: |
+          bundle_dir="src-tauri/target/${MACOS_TARGET}/release/bundle/macos"
+          app_path="$(find "${bundle_dir}" -maxdepth 1 -type d -name '*.app' -print -quit)"
+
+          if [ -z "${app_path}" ]; then
+              echo "No macOS application bundle found in ${bundle_dir}" >&2
+              exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "${app_path}"
+          spctl --assess --type execute --verbose=4 "${app_path}"
+          xcrun stapler validate "${app_path}"
+
+  finalize:
+    name: Validate and publish release
+    needs: publish
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate release token
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "${RELEASE_TOKEN}" ]; then
+              echo "Missing required Actions secret: RELEASE_TOKEN" >&2
+              exit 1
+          fi
+
+      - name: Download updater manifest from draft release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/essay-release"
+          gh release download "${GITHUB_REF_NAME}" \
+              --repo "${RELEASE_REPOSITORY}" \
+              --pattern latest.json \
+              --dir "${RUNNER_TEMP}/essay-release"
+
+      - name: Validate updater manifest
+        env:
+          LATEST_JSON: ${{ runner.temp }}/essay-release/latest.json
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          const manifest = JSON.parse(
+              fs.readFileSync(process.env.LATEST_JSON, 'utf8')
+          )
+          const expectedPlatforms = [
+              'windows-x86_64',
+              'darwin-aarch64',
+              'darwin-x86_64',
+          ]
+          const expectedPath = '/nanbingxyz/essayeditor-releases/releases/download/'
+
+          for (const platform of expectedPlatforms) {
+              const entry = manifest.platforms?.[platform]
+              if (!entry?.url || !entry?.signature) {
+                  throw new Error(`latest.json is missing a valid ${platform} entry`)
+              }
+
+              const url = new URL(entry.url)
+              if (url.hostname !== 'github.com' || !url.pathname.startsWith(expectedPath)) {
+                  throw new Error(`${platform} points outside the public release repository`)
+              }
+          }
+          NODE
+
+      - name: Publish draft as latest release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          is_draft="$(gh release view "${GITHUB_REF_NAME}" \
+              --repo "${RELEASE_REPOSITORY}" \
+              --json isDraft \
+              --jq '.isDraft')"
+
+          if [ "${is_draft}" != 'true' ]; then
+              echo "Expected ${GITHUB_REF_NAME} to be a draft release" >&2
+              exit 1
+          fi
+
+          gh release edit "${GITHUB_REF_NAME}" \
+              --repo "${RELEASE_REPOSITORY}" \
+              --draft=false \
+              --latest

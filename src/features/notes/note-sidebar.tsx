@@ -4,6 +4,7 @@ import {
     Delete20Regular,
     DismissCircle16Filled,
     Edit20Regular,
+    Folder16Regular,
     FolderSearch16Regular,
     Send20Filled,
 } from '@fluentui/react-icons'
@@ -36,7 +37,6 @@ import {
 import MarkdownPreview from './markdown-preview'
 import type { Note, NoteFolder, NoteQuery } from './note-client'
 import './notes.css'
-import { cn } from '@/shared/lib'
 
 interface NoteSidebarProps {
     enabled: boolean
@@ -187,6 +187,12 @@ function NoteSearchControls({
         onSearch({ keyword, folderIds: draftFolderIds })
     }
 
+    const clearFolders = () => {
+        setDraftFolderIds([])
+        setFolderOpen(false)
+        onSearch({ keyword, folderIds: [] })
+    }
+
     const folderOptions = [
         { id: 'unclassified', name: '未分类' },
         ...folders,
@@ -220,6 +226,18 @@ function NoteSearchControls({
             </form>
 
             <div ref={folderRootRef} className="note-folder-filter">
+                {query.folderIds.length > 0 && (
+                    <button
+                        type="button"
+                        className="note-folder-filter-clear"
+                        aria-label="清空文件夹筛选"
+                        title="清空文件夹筛选"
+                        disabled={disabled}
+                        onClick={clearFolders}
+                    >
+                        <DismissCircle16Filled aria-hidden="true" />
+                    </button>
+                )}
                 <button
                     type="button"
                     className="note-folder-filter-trigger"
@@ -270,7 +288,7 @@ function NoteSearchControls({
                                 size="sm"
                                 onClick={confirmFolders}
                             >
-                                {draftFolderIds.length > 0 ? '按文件夹过滤' : '确定'}
+                                确定
                             </Button>
                         </div>
                     </div>
@@ -674,6 +692,9 @@ export default function NoteSidebar({
             {!enabled ? (
                 <div className="note-list-message">
                     <span>设置 API Key 后即可管理个人笔记</span>
+                    <button type="button" onClick={onOpenSettings}>
+                        打开设置
+                    </button>
                 </div>
             ) : (
                 <div ref={listRef} className="note-list-region">

@@ -40,8 +40,8 @@
     box-shadow: none;
 }
 
-.note-folder-filter-trigger
- {
+.note-folder-filter-trigger,
+.note-folder-filter-clear {
     display: inline-flex;
     width: 28px;
     height: 28px;
@@ -61,7 +61,8 @@
 
 
 .note-search-clear:disabled,
-.note-folder-filter-trigger:disabled {
+.note-folder-filter-trigger:disabled,
+.note-folder-filter-clear:disabled {
     cursor: not-allowed;
     opacity: 0.5;
 }
@@ -84,6 +85,11 @@
 .note-folder-filter-trigger > svg {
     width: 17px;
     height: 17px;
+}
+
+.note-folder-filter-clear > svg {
+    width: 15px;
+    height: 15px;
 }
 
 .note-folder-filter-badge {

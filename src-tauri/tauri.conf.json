@@ -38,15 +38,13 @@
     },
     "plugins": {
         "updater": {
-            "active": true,
             "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE1OTkzNjRBN0FFQjc4MDcKUldRSGVPdDZTamFacFYxOHlnNnR0RDhmeFhic245SW9GYU1uM242MzJSaEJUbU96RGxKYlE4L00K",
             "endpoints": [
-                "https://github.com/nanbingxzy/essayeditor/releases/latest/download/latest.json"
+                "https://github.com/nanbingxyz/essayeditor-releases/releases/latest/download/latest.json"
             ],
-            "dialog": true
-        },
-        "windows": {
-            "installMode": "passive"
+            "windows": {
+                "installMode": "passive"
+            }
         }
     }
 }
