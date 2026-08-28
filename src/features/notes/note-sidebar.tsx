@@ -152,7 +152,7 @@ function NoteFolderMenu({
         <div ref={rootRef} className="note-folder-menu">
             <button
                 type="button"
-                className="note-folder-menu-trigger"
+                className="note-folder-menu-trigger rounded-full"
                 aria-label={`笔记文件夹：${selectedLabel}`}
                 aria-expanded={open}
                 aria-haspopup="listbox"
