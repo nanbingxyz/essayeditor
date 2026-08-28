@@ -58,25 +58,20 @@
 
 .note-card {
     position: relative;
-    display: flex;
     width: 100%;
     max-height: 300px;
     min-height: 84px;
     min-width: 0;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid hsl(var(--border));
-    border-radius: 9px;
     color: inherit;
-    background: hsl(var(--card) / 0.48);
     cursor: pointer;
     text-align: left;
-    transition: border-color 140ms ease, background-color 140ms ease;
 }
 
-.note-card:hover {
-    border-color: hsl(var(--muted-foreground) / 0.34);
-    background: hsl(var(--accent) / 0.42);
+.note-card-body {
+    display: flex;
+    min-height: 100%;
+    flex: 1;
+    flex-direction: column;
 }
 
 .note-card:focus-visible {
@@ -117,13 +112,12 @@
     bottom: 0;
     left: 0;
     height: 22px;
-    background: linear-gradient(transparent, hsl(var(--card)));
+    background: linear-gradient(
+        transparent,
+        color-mix(in srgb, hsl(var(--background)) 92%, transparent)
+    );
     content: '';
     pointer-events: none;
-}
-
-.note-card:hover .note-card-content::after {
-    background: linear-gradient(transparent, hsl(var(--accent)));
 }
 
 .note-markdown-preview {
@@ -239,9 +233,9 @@
     flex: 0 1 auto;
     padding: 7px 10px 8px;
     overflow-y: auto;
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid hsl(var(--border-secondary));
     color: hsl(var(--muted-foreground));
-    background: hsl(var(--muted) / 0.22);
+    background: hsl(var(--muted) / 0.4);
     font-size: 0.75rem;
     line-height: 1.45;
 }

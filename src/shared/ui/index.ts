@@ -15,6 +15,11 @@ export {
 export {Input} from './input'
 export {Label} from './label'
 export {Progress} from './progress'
+export {
+    GridPatternCard,
+    GridPatternCardBody,
+    type GridPatternCardProps,
+} from './grid-pattern-card'
 export {Toaster} from './toaster'
 export {Toggle, toggleVariants} from './toggle'
 export {ToastAction} from './toast'

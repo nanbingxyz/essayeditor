@@ -76,6 +76,17 @@ describe('NoteSidebar', () => {
         expect(container.querySelector('.note-card')?.textContent).toContain(
             'Work'
         )
+        expect(
+            container.querySelector('.note-card.grid-pattern-card')
+        ).not.toBeNull()
+        expect(
+            container.querySelector('.note-card .grid-pattern-card-body')
+        ).not.toBeNull()
+        expect(
+            container.querySelector(
+                '.note-card > .grid-pattern-card-pattern > .grid-pattern-card-gradient > .grid-pattern-card-body'
+            )
+        ).not.toBeNull()
 
         act(() => (refresh as HTMLButtonElement).click())
         expect(props.onRefresh).toHaveBeenCalledTimes(1)

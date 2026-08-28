@@ -18,7 +18,7 @@ import {
     MarkdownEditor,
     type MarkdownEditorHandle,
 } from '@/features/editor'
-import {Button, Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, useToast} from '@/shared/ui'
+import {Button, Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, GridPatternCard, GridPatternCardBody, useToast} from '@/shared/ui'
 
 import MarkdownPreview from './markdown-preview'
 import type {Note, NoteFolder} from './note-client'
@@ -504,7 +504,7 @@ export default function NoteSidebar({
                     ) : (
                         <div className="note-list">
                             {notes.map((note) => (
-                                <div
+                                <GridPatternCard
                                     role="button"
                                     tabIndex={0}
                                     className="note-card"
@@ -521,17 +521,19 @@ export default function NoteSidebar({
                                         }
                                     }}
                                 >
-                                    <div className="note-card-meta">
-                                        <span>{note.folder?.name ?? '未分类'}</span>
-                                        <time dateTime={note.createdAt}>
-                                            {formatTimestamp(note.createdAt)}
-                                        </time>
-                                    </div>
-                                    <div className="note-card-content">
-                                        <MarkdownPreview content={note.content} />
-                                    </div>
-                                    <CommentList note={note} />
-                                </div>
+                                    <GridPatternCardBody className="note-card-body">
+                                        <div className="note-card-meta">
+                                            <span>{note.folder?.name ?? '未分类'}</span>
+                                            <time dateTime={note.createdAt}>
+                                                {formatTimestamp(note.createdAt)}
+                                            </time>
+                                        </div>
+                                        <div className="note-card-content">
+                                            <MarkdownPreview content={note.content} />
+                                        </div>
+                                        <CommentList note={note} />
+                                    </GridPatternCardBody>
+                                </GridPatternCard>
                             ))}
                             {moreError && (
                                 <div className="note-list-message is-compact">
