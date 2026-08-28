@@ -294,7 +294,7 @@
     min-width: 0;
     color: hsl(var(--foreground) / 0.88);
     font-family: 'Noto Serif SC Variable', serif;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.7;
     overflow-wrap: anywhere;
 }
@@ -406,7 +406,7 @@
     border-top: 1px solid hsl(var(--border-secondary));
     color: hsl(var(--muted-foreground));
     background: hsl(var(--muted) / 0.4);
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     line-height: 1.45;
 }
 

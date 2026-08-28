@@ -674,9 +674,6 @@ export default function NoteSidebar({
             {!enabled ? (
                 <div className="note-list-message">
                     <span>设置 API Key 后即可管理个人笔记</span>
-                    <Button type="button" variant="outline" onClick={onOpenSettings}>
-                        打开设置
-                    </Button>
                 </div>
             ) : (
                 <div ref={listRef} className="note-list-region">

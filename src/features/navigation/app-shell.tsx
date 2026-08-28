@@ -156,7 +156,8 @@ export default function AppShell({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                className="set-api-key-button"
+                                size="sm"
+                                className="set-api-key-button rounded-full"
                                 onClick={onOpenSettings}
                             >
                                 设置 API Key
