@@ -9,6 +9,7 @@ import {
 } from 'react'
 import {
     AddRegular,
+    ArrowClockwiseRegular,
 } from '@fluentui/react-icons'
 
 import {
@@ -124,7 +125,8 @@ export default function SidebarEssayList({
     const [pullDistance, setPullDistanceState] = useState(0)
     const [refreshRequested, setRefreshRequested] = useState(false)
     const refreshActive = refreshing || refreshRequested
-    const refreshBlocked = refreshActive || refreshDisabled || loading
+    const refreshBlocked =
+        refreshActive || refreshDisabled || loading || loadingMore
 
     const setPullDistance = useCallback((distance: number) => {
         pullDistanceRef.current = distance
@@ -186,7 +188,7 @@ export default function SidebarEssayList({
     }, [selectedDate])
 
     useEffect(() => {
-        if (refreshing) {
+        if (refreshing && refreshRequested) {
             refreshObservedRef.current = true
             setPullDistance(PULL_REFRESH_ACTIVE_DISTANCE)
             return
@@ -323,16 +325,34 @@ export default function SidebarEssayList({
     return (
         <>
             <div className="sidebar-create-action flex justify-between items-center">
-               <span className="text-xs font-semibold opacity-60">Essays</span>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="sidebar-create-button size-6"
-                    onClick={onCreateDraft}
-                >
-                    <AddRegular />
-                </Button>
+                <span className="text-xs font-semibold opacity-60">Essays</span>
+                <div className="sidebar-action-buttons">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="sidebar-refresh-button size-6"
+                        aria-label="刷新文章"
+                        title="刷新文章"
+                        disabled={refreshBlocked}
+                        onClick={onRefresh}
+                    >
+                        <ArrowClockwiseRegular
+                            className={`sidebar-refresh-icon ${refreshActive ? 'is-spinning' : ''}`}
+                        />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="sidebar-create-button size-6"
+                        aria-label="添加文章"
+                        title="添加文章"
+                        onClick={onCreateDraft}
+                    >
+                        <AddRegular />
+                    </Button>
+                </div>
             </div>
             <div
                 ref={regionRef}

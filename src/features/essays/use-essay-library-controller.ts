@@ -1,12 +1,24 @@
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
 import type {DraftRepository} from '@/features/editor'
 
+import {
+    ALL_ESSAYS_QUERY_KEY,
+    type EssayLibraryCacheRepository,
+} from './essay-library-cache-repository'
 import {
     PAGE_SIZE,
     type EssayLibraryClient,
     type EssayListItem,
 } from './essay-library-client'
+
+const MINUTE = 60 * 1000
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+export const ALL_ESSAYS_CACHE_TTL = 5 * DAY
+export const FILTERED_ESSAYS_CACHE_TTL = 8 * HOUR
+export const ALL_ESSAYS_REFRESH_INTERVAL = 10 * MINUTE
 
 export interface EssayListEntry extends EssayListItem {
     localContent?: string
@@ -14,49 +26,110 @@ export interface EssayListEntry extends EssayListItem {
 
 interface EssayLibraryControllerOptions {
     accessToken: string
+    cacheRepository: EssayLibraryCacheRepository
     client: EssayLibraryClient
     date: string | null
     draftRepository: DraftRepository
     enabled: boolean
+    now?: () => number
     onError: (message: string) => void
     userId: string
 }
 
+interface HydrationState {
+    queryIdentity: string | null
+    ready: boolean
+    shouldRefresh: boolean
+}
+
+function getQueryKey(date: string | null) {
+    return date ? `date:${date}` : ALL_ESSAYS_QUERY_KEY
+}
+
+function isCacheValid(
+    cachedAt: number,
+    date: string | null,
+    timestamp: number
+) {
+    const age = timestamp - cachedAt
+    const ttl = date ? FILTERED_ESSAYS_CACHE_TTL : ALL_ESSAYS_CACHE_TTL
+    return age >= 0 && age <= ttl
+}
+
+function remoteEntries(entries: EssayListEntry[]): EssayListItem[] {
+    return entries.map(({id, content}) => ({id, content}))
+}
+
 export function useEssayLibraryController({
     accessToken,
+    cacheRepository,
     client,
     date,
     draftRepository,
     enabled,
+    now = Date.now,
     onError,
     userId,
 }: EssayLibraryControllerOptions) {
     const [entries, setEntries] = useState<EssayListEntry[]>([])
     const [error, setError] = useState<string | null>(null)
     const [hasMore, setHasMore] = useState(false)
+    const [hydration, setHydration] = useState<HydrationState>({
+        queryIdentity: null,
+        ready: false,
+        shouldRefresh: false,
+    })
     const [loading, setLoading] = useState(false)
     const [loadingMore, setLoadingMore] = useState(false)
     const [moreError, setMoreError] = useState<string | null>(null)
     const [page, setPage] = useState(0)
     const [refreshing, setRefreshing] = useState(false)
-    const [refreshVersion, setRefreshVersion] = useState(0)
     const abortRef = useRef<AbortController>()
+    const autoRefreshStartedRef = useRef(false)
     const entriesRef = useRef<EssayListEntry[]>([])
+    const firstPageBusyRef = useRef(false)
+    const firstPageFetchedAtRef = useRef(0)
     const generationRef = useRef(0)
-    const onErrorRef = useRef(onError)
     const hasMoreRef = useRef(false)
     const loadingMoreRef = useRef(false)
+    const loadingRef = useRef(false)
+    const onErrorRef = useRef(onError)
     const pageRef = useRef(0)
-    const queryKeyRef = useRef<string | null>(null)
-    const refreshRequestedRef = useRef(false)
-    const refreshingRef = useRef(false)
+    const queryIdentity = useMemo(
+        () =>
+            enabled && accessToken
+                ? JSON.stringify([accessToken, getQueryKey(date)])
+                : null,
+        [accessToken, date, enabled]
+    )
+    const queryKey = getQueryKey(date)
 
     onErrorRef.current = onError
     entriesRef.current = entries
     hasMoreRef.current = hasMore
     loadingMoreRef.current = loadingMore
+    loadingRef.current = loading
     pageRef.current = page
-    refreshingRef.current = refreshing
+
+    const setCurrentEntries = useCallback((nextEntries: EssayListEntry[]) => {
+        entriesRef.current = nextEntries
+        setEntries(nextEntries)
+    }, [])
+
+    const setCurrentHasMore = useCallback((nextHasMore: boolean) => {
+        hasMoreRef.current = nextHasMore
+        setHasMore(nextHasMore)
+    }, [])
+
+    const setCurrentLoading = useCallback((nextLoading: boolean) => {
+        loadingRef.current = nextLoading
+        setLoading(nextLoading)
+    }, [])
+
+    const setCurrentPage = useCallback((nextPage: number) => {
+        pageRef.current = nextPage
+        setPage(nextPage)
+    }, [])
 
     const hydrateEntries = useCallback(
         async (essays: EssayListItem[]) =>
@@ -79,104 +152,210 @@ export function useEssayLibraryController({
     useEffect(() => {
         abortRef.current?.abort()
         const generation = ++generationRef.current
-        const queryKey = enabled
-            ? JSON.stringify([accessToken, date, userId])
-            : null
-        const isRefresh =
-            refreshRequestedRef.current && queryKeyRef.current === queryKey
-        const hadEntries = entriesRef.current.length > 0
-        refreshRequestedRef.current = false
-        queryKeyRef.current = queryKey
+        autoRefreshStartedRef.current = false
+        firstPageBusyRef.current = false
+        loadingMoreRef.current = false
+        setCurrentEntries([])
+        setError(null)
+        setCurrentHasMore(false)
+        setCurrentLoading(Boolean(queryIdentity))
+        setLoadingMore(false)
+        setMoreError(null)
+        setCurrentPage(0)
+        setRefreshing(false)
+        firstPageFetchedAtRef.current = 0
+        setHydration({
+            queryIdentity,
+            ready: false,
+            shouldRefresh: false,
+        })
 
-        if (!enabled || !accessToken || !userId) {
-            setEntries([])
-            setError(null)
-            setHasMore(false)
-            setLoading(false)
-            setLoadingMore(false)
-            setMoreError(null)
-            setPage(0)
-            setRefreshing(false)
+        if (!queryIdentity || !accessToken) {
             return
         }
 
+        void cacheRepository
+            .load({accessToken, queryKey})
+            .catch(() => null)
+            .then(async (snapshot) => {
+                if (generation !== generationRef.current) {
+                    return
+                }
+                const timestamp = now()
+                if (!snapshot || !isCacheValid(snapshot.cachedAt, date, timestamp)) {
+                    setHydration({
+                        queryIdentity,
+                        ready: true,
+                        shouldRefresh: true,
+                    })
+                    return
+                }
+
+                firstPageFetchedAtRef.current = snapshot.firstPageFetchedAt
+                const allRecentlyRefreshed =
+                    !date &&
+                    timestamp - snapshot.firstPageFetchedAt >= 0 &&
+                    timestamp - snapshot.firstPageFetchedAt <
+                        ALL_ESSAYS_REFRESH_INTERVAL
+                const restoreFullSnapshot = Boolean(date) || allRecentlyRefreshed
+                const cachedEntries = restoreFullSnapshot
+                    ? snapshot.entries
+                    : snapshot.entries.slice(0, PAGE_SIZE)
+                const hydratedEntries = await hydrateEntries(cachedEntries)
+                if (generation !== generationRef.current) {
+                    return
+                }
+
+                setCurrentEntries(hydratedEntries)
+                setCurrentHasMore(
+                    restoreFullSnapshot
+                        ? snapshot.hasMore
+                        : snapshot.page > 1 || snapshot.hasMore
+                )
+                setCurrentPage(restoreFullSnapshot ? snapshot.page : 1)
+                setCurrentLoading(false)
+                setHydration({
+                    queryIdentity,
+                    ready: true,
+                    shouldRefresh: Boolean(date) || !allRecentlyRefreshed,
+                })
+            })
+
+        return () => abortRef.current?.abort()
+    }, [
+        accessToken,
+        cacheRepository,
+        date,
+        hydrateEntries,
+        now,
+        queryIdentity,
+        queryKey,
+        setCurrentEntries,
+        setCurrentHasMore,
+        setCurrentLoading,
+        setCurrentPage,
+    ])
+
+    const fetchFirstPage = useCallback(async () => {
+        if (
+            !enabled ||
+            !accessToken ||
+            !userId ||
+            firstPageBusyRef.current ||
+            loadingMoreRef.current ||
+            !hydration.ready ||
+            hydration.queryIdentity !== queryIdentity
+        ) {
+            return
+        }
+
+        firstPageBusyRef.current = true
+        const generation = generationRef.current
+        const hadEntries = entriesRef.current.length > 0
         const abortController = new AbortController()
         abortRef.current = abortController
         setError(null)
-        setHasMore(false)
-        setLoadingMore(false)
         setMoreError(null)
-        setPage(0)
-        if (isRefresh) {
-            setLoading(false)
-            setRefreshing(true)
-        } else {
-            setEntries([])
-            setLoading(true)
-            setRefreshing(false)
-        }
+        setRefreshing(true)
+        setCurrentLoading(!hadEntries)
 
-        void client
-            .list({
+        try {
+            const responseEntries = await client.list({
                 accessToken,
                 date,
                 page: 1,
                 signal: abortController.signal,
                 userId,
             })
-            .then(async (nextEntries) => ({
-                entries: await hydrateEntries(
-                    nextEntries.slice(0, PAGE_SIZE)
-                ),
-                hasMore: nextEntries.length > PAGE_SIZE,
-            }))
-            .then(({entries: nextEntries, hasMore: nextHasMore}) => {
-                if (
-                    abortController.signal.aborted ||
-                    generation !== generationRef.current
-                ) {
-                    return
-                }
-                setEntries(nextEntries)
-                setHasMore(nextHasMore)
-                setPage(1)
-                setLoading(false)
-                setRefreshing(false)
-            })
-            .catch((requestError: unknown) => {
-                if (
-                    abortController.signal.aborted ||
-                    generation !== generationRef.current
-                ) {
-                    return
-                }
-                const message =
-                    requestError instanceof Error
-                        ? requestError.message
-                        : '无法加载文章，请稍后重试'
-                setError(isRefresh && hadEntries ? null : message)
-                setLoading(false)
-                setRefreshing(false)
-                onErrorRef.current(message)
-            })
+            const nextEntries = await hydrateEntries(
+                responseEntries.slice(0, PAGE_SIZE)
+            )
+            if (
+                abortController.signal.aborted ||
+                generation !== generationRef.current
+            ) {
+                return
+            }
 
-        return () => abortController.abort()
+            const timestamp = now()
+            const nextHasMore = responseEntries.length > PAGE_SIZE
+            firstPageFetchedAtRef.current = timestamp
+            setCurrentEntries(nextEntries)
+            setCurrentHasMore(nextHasMore)
+            setCurrentPage(1)
+            setCurrentLoading(false)
+            await cacheRepository
+                .save(
+                    {accessToken, queryKey},
+                    {
+                        cachedAt: timestamp,
+                        entries: remoteEntries(nextEntries),
+                        firstPageFetchedAt: timestamp,
+                        hasMore: nextHasMore,
+                        page: 1,
+                    }
+                )
+                .catch(() => undefined)
+        } catch (requestError) {
+            if (
+                abortController.signal.aborted ||
+                generation !== generationRef.current
+            ) {
+                return
+            }
+            const message =
+                requestError instanceof Error
+                    ? requestError.message
+                    : '无法加载文章，请稍后重试'
+            setError(hadEntries ? null : message)
+            setCurrentLoading(false)
+            onErrorRef.current(message)
+        } finally {
+            if (generation === generationRef.current) {
+                firstPageBusyRef.current = false
+                setRefreshing(false)
+            }
+        }
     }, [
         accessToken,
+        cacheRepository,
         client,
         date,
         enabled,
         hydrateEntries,
-        refreshVersion,
+        hydration.queryIdentity,
+        hydration.ready,
+        now,
+        queryIdentity,
+        queryKey,
+        setCurrentEntries,
+        setCurrentHasMore,
+        setCurrentLoading,
+        setCurrentPage,
         userId,
     ])
+
+    useEffect(() => {
+        if (
+            !hydration.ready ||
+            !hydration.shouldRefresh ||
+            hydration.queryIdentity !== queryIdentity ||
+            !userId ||
+            autoRefreshStartedRef.current
+        ) {
+            return
+        }
+        autoRefreshStartedRef.current = true
+        void fetchFirstPage()
+    }, [fetchFirstPage, hydration, queryIdentity, userId])
 
     const loadMore = useCallback(async () => {
         if (
             !enabled ||
             !hasMoreRef.current ||
             loadingMoreRef.current ||
-            refreshingRef.current ||
+            firstPageBusyRef.current ||
+            loadingRef.current ||
             !accessToken ||
             !userId
         ) {
@@ -199,7 +378,7 @@ export function useEssayLibraryController({
                 signal: abortController.signal,
                 userId,
             })
-            const nextEntries = await hydrateEntries(
+            const hydratedEntries = await hydrateEntries(
                 responseEntries.slice(0, PAGE_SIZE)
             )
             if (
@@ -211,12 +390,27 @@ export function useEssayLibraryController({
             const existingIds = new Set(
                 entriesRef.current.map(({id}) => id)
             )
-            const uniqueNextEntries = nextEntries.filter(
+            const uniqueNextEntries = hydratedEntries.filter(
                 ({id}) => !existingIds.has(id)
             )
-            setEntries((current) => [...current, ...uniqueNextEntries])
-            setHasMore(responseEntries.length > PAGE_SIZE)
-            setPage(nextPage)
+            const nextEntries = [...entriesRef.current, ...uniqueNextEntries]
+            const nextHasMore = responseEntries.length > PAGE_SIZE
+            const timestamp = now()
+            setCurrentEntries(nextEntries)
+            setCurrentHasMore(nextHasMore)
+            setCurrentPage(nextPage)
+            await cacheRepository
+                .save(
+                    {accessToken, queryKey},
+                    {
+                        cachedAt: timestamp,
+                        entries: remoteEntries(nextEntries),
+                        firstPageFetchedAt: firstPageFetchedAtRef.current,
+                        hasMore: nextHasMore,
+                        page: nextPage,
+                    }
+                )
+                .catch(() => undefined)
         } catch (requestError) {
             if (
                 abortController.signal.aborted ||
@@ -235,69 +429,103 @@ export function useEssayLibraryController({
                 setLoadingMore(false)
             }
         }
-    }, [accessToken, client, date, enabled, hydrateEntries, userId])
+    }, [
+        accessToken,
+        cacheRepository,
+        client,
+        date,
+        enabled,
+        hydrateEntries,
+        now,
+        queryKey,
+        setCurrentEntries,
+        setCurrentHasMore,
+        setCurrentPage,
+        userId,
+    ])
 
     const refresh = useCallback(() => {
         if (
             !enabled ||
             !accessToken ||
             !userId ||
-            refreshingRef.current
+            firstPageBusyRef.current ||
+            loadingMoreRef.current ||
+            !hydration.ready
         ) {
             return
         }
-        refreshRequestedRef.current = true
-        refreshingRef.current = true
-        setRefreshing(true)
-        setRefreshVersion((version) => version + 1)
-    }, [accessToken, enabled, userId])
+        void fetchFirstPage()
+    }, [accessToken, enabled, fetchFirstPage, hydration.ready, userId])
 
     const retry = useCallback(() => {
-        if (entries.length === 0) {
-            refresh()
-        } else {
+        if (moreError && entriesRef.current.length > 0) {
             void loadMore()
+        } else {
+            refresh()
         }
-    }, [entries.length, loadMore, refresh])
+    }, [loadMore, moreError, refresh])
 
     const setLocalContent = useCallback(
         (essayId: string, localContent: string | null) => {
-            setEntries((current) =>
-                current.map((entry) =>
-                    entry.id === essayId
-                        ? {
-                              ...entry,
-                              localContent: localContent ?? undefined,
-                          }
-                        : entry
-                )
-            )
-        },
-        []
-    )
-
-    const commitUpdate = useCallback((essayId: string, content: string) => {
-        setEntries((current) =>
-            current.map((entry) =>
+            const nextEntries = entriesRef.current.map((entry) =>
                 entry.id === essayId
-                    ? {id: entry.id, content}
+                    ? {...entry, localContent: localContent ?? undefined}
                     : entry
             )
-        )
-    }, [])
+            setCurrentEntries(nextEntries)
+        },
+        [setCurrentEntries]
+    )
 
-    const commitPublish = useCallback((essayId: string, content: string) => {
-        setEntries((current) => [
-            {id: essayId, content},
-            ...current.filter((entry) => entry.id !== essayId),
-        ])
-    }, [])
+    const commitUpdate = useCallback(
+        (essayId: string, content: string) => {
+            setCurrentEntries(
+                entriesRef.current.map((entry) =>
+                    entry.id === essayId ? {id: entry.id, content} : entry
+                )
+            )
+            if (accessToken) {
+                void cacheRepository
+                    .updateEssay(accessToken, essayId, content)
+                    .catch(() => undefined)
+            }
+        },
+        [accessToken, cacheRepository, setCurrentEntries]
+    )
 
-    const commitRemove = useCallback((essayId: string) => {
-        setEntries((current) =>
-            current.filter((entry) => entry.id !== essayId)
-        )
-    }, [])
+    const commitPublish = useCallback(
+        (essayId: string, content: string) => {
+            if (!date) {
+                setCurrentEntries([
+                    {id: essayId, content},
+                    ...entriesRef.current.filter(
+                        (entry) => entry.id !== essayId
+                    ),
+                ])
+            }
+            if (accessToken) {
+                void cacheRepository
+                    .prependToAll(accessToken, {id: essayId, content})
+                    .catch(() => undefined)
+            }
+        },
+        [accessToken, cacheRepository, date, setCurrentEntries]
+    )
+
+    const commitRemove = useCallback(
+        (essayId: string) => {
+            setCurrentEntries(
+                entriesRef.current.filter((entry) => entry.id !== essayId)
+            )
+            if (accessToken) {
+                void cacheRepository
+                    .removeEssay(accessToken, essayId)
+                    .catch(() => undefined)
+            }
+        },
+        [accessToken, cacheRepository, setCurrentEntries]
+    )
 
     return {
         commitPublish,

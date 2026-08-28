@@ -82,9 +82,24 @@ describe('SidebarEssayList', () => {
         ).toEqual(['Newest draft', 'Older draft', 'Published essay'])
 
         act(() =>
-            (createAction.querySelector('button') as HTMLButtonElement).click()
+            (
+                createAction.querySelector(
+                    '.sidebar-create-button'
+                ) as HTMLButtonElement
+            ).click()
         )
         expect(onCreateDraft).toHaveBeenCalledTimes(1)
+
+        const refreshButton = createAction.querySelector(
+            '.sidebar-refresh-button'
+        ) as HTMLButtonElement
+        const createButton = createAction.querySelector(
+            '.sidebar-create-button'
+        ) as HTMLButtonElement
+        expect(
+            refreshButton.compareDocumentPosition(createButton) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).not.toBe(0)
 
         act(() => root.unmount())
         container.remove()
@@ -336,6 +351,65 @@ describe('SidebarEssayList', () => {
         region.scrollTop = 590
         act(() => region.dispatchEvent(new Event('scroll', {bubbles: true})))
         expect(onLoadMore).toHaveBeenCalledTimes(1)
+
+        act(() => root.unmount())
+        container.remove()
+    })
+
+    it('spins for first-page refreshes and disables without spinning while loading more', () => {
+        const container = document.body.appendChild(document.createElement('div'))
+        const root = createRoot(container)
+        const props = {
+            activeDocumentId: null,
+            drafts: [],
+            entries: [{id: 'one', content: 'Published'}],
+            error: null,
+            hasMore: true,
+            loading: false,
+            loadingMore: false,
+            moreError: null,
+            onCreateDraft: vi.fn(),
+            onLoadMore: vi.fn(),
+            onRefresh: vi.fn(),
+            onRetry: vi.fn(),
+            onSelectDraft: vi.fn(),
+            onSelectEssay: vi.fn(),
+            refreshDisabled: false,
+            refreshing: true,
+            selectedDate: null,
+        }
+
+        act(() => root.render(<SidebarEssayList {...props} />))
+        let refreshButton = container.querySelector(
+            '.sidebar-refresh-button'
+        ) as HTMLButtonElement
+        expect(refreshButton.disabled).toBe(true)
+        expect(
+            refreshButton.querySelector('.sidebar-refresh-icon.is-spinning')
+        ).not.toBeNull()
+        expect(container.querySelector('.pull-refresh-indicator')?.textContent)
+            .toContain('正在刷新')
+        expect(
+            (container.querySelector('.pull-refresh-indicator') as HTMLElement)
+                .style.getPropertyValue('--pull-refresh-distance')
+        ).toBe('0px')
+
+        act(() =>
+            root.render(
+                <SidebarEssayList
+                    {...props}
+                    refreshing={false}
+                    loadingMore
+                />
+            )
+        )
+        refreshButton = container.querySelector(
+            '.sidebar-refresh-button'
+        ) as HTMLButtonElement
+        expect(refreshButton.disabled).toBe(true)
+        expect(
+            refreshButton.querySelector('.sidebar-refresh-icon.is-spinning')
+        ).toBeNull()
 
         act(() => root.unmount())
         container.remove()

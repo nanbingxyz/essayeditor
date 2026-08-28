@@ -19,6 +19,7 @@ import {
     useDraftController,
 } from '@/features/editor'
 import {
+    createEssayLibraryCacheRepository,
     createEssayLibraryClient,
     type EssayListEntry,
     SidebarEssayList,
@@ -104,6 +105,10 @@ export default function App() {
         () => createEssayLibraryClient({baseUrl: essayApiBaseUrl}),
         []
     )
+    const essayLibraryCacheRepository = useMemo(
+        createEssayLibraryCacheRepository,
+        []
+    )
 
     localDraftsRef.current = localDrafts
 
@@ -182,12 +187,11 @@ export default function App() {
     )
     const library = useEssayLibraryController({
         accessToken: settings.accessToken,
+        cacheRepository: essayLibraryCacheRepository,
         client: essayLibraryClient,
         date: selectedDate,
         draftRepository,
-        enabled: Boolean(
-            settings.ready && settings.accessToken && activity.user?.id
-        ),
+        enabled: Boolean(settings.ready && settings.accessToken),
         onError: notifyEssayListError,
         userId: activity.user?.id ?? '',
     })
@@ -226,9 +230,7 @@ export default function App() {
                       }
                     : current
             )
-            if (!selectedDate) {
-                library.commitPublish(id, publishedDraft.content)
-            }
+            library.commitPublish(id, publishedDraft.content)
 
             try {
                 await draftRepository.removeLocalDraft(
@@ -261,7 +263,7 @@ export default function App() {
                 ),
             })
         },
-        [activity, draftRepository, library, selectedDate, toast]
+        [activity, draftRepository, library, toast]
     )
 
     const publishing = usePublishingController({
@@ -670,7 +672,9 @@ export default function App() {
             activity.loading
     )
     const listError =
-        settings.accessToken && activity.error ? activity.error : library.error
+        settings.accessToken && activity.error && library.entries.length === 0
+            ? activity.error
+            : library.error
 
     return (
         <AppShell
@@ -709,8 +713,8 @@ export default function App() {
                     hasMore={library.hasMore}
                     loading={
                         !settings.ready ||
-                        listWaitingForUser ||
-                        library.loading
+                        (listWaitingForUser && library.entries.length === 0) ||
+                        (library.loading && !activity.error)
                     }
                     loadingMore={library.loadingMore}
                     moreError={library.moreError}
@@ -723,7 +727,10 @@ export default function App() {
                     onSelectDraft={(entry) => void selectDraft(entry)}
                     onSelectEssay={(essay) => void selectEssay(essay)}
                     refreshDisabled={Boolean(
-                        !settings.accessToken || activity.error
+                        !settings.accessToken ||
+                            !activity.user?.id ||
+                            activity.error ||
+                            library.loadingMore
                     )}
                     refreshing={library.refreshing}
                     selectedDate={selectedDate}

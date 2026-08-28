@@ -113,10 +113,15 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     padding: 6px 12px 3px 12px;
 }
 
-.sidebar-create-button {
-    width: 100%;
+.sidebar-action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
+.sidebar-refresh-icon.is-spinning {
+    animation: pull-refresh-spin 700ms linear infinite;
+}
 
 .sidebar-list-region {
     min-height: 0;
