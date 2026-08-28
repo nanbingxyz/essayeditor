@@ -385,7 +385,7 @@
     line-height: 1.85;
 }
 
-.note-editor-dialog {
+.note-editor-dialog.note-editor-dialog {
     display: flex;
     width: min(680px, calc(100vw - 32px));
     max-width: 680px;
@@ -413,7 +413,9 @@
 
 .note-editor-footer {
     display: flex;
+    height: 58px;
     min-height: 58px;
+    max-height: 58px;
     flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
