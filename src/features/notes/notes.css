@@ -424,25 +424,126 @@
     border-top: 1px solid hsl(var(--border-secondary));
 }
 
-.note-folder-select-label select {
+.note-folder-menu {
+    position: relative;
+}
+
+.note-folder-menu-trigger {
+    display: inline-flex;
     max-width: 240px;
     height: 32px;
-    padding: 0 30px 0 10px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 9px;
     border: 1px solid hsl(var(--border));
     border-radius: 7px;
     color: hsl(var(--foreground));
     background: hsl(var(--background));
     font-size: 12px;
+    transition:
+        border-color 120ms ease,
+        background-color 120ms ease;
 }
 
-.note-folder-select-label select:focus-visible {
+.note-folder-menu-trigger:hover,
+.note-folder-menu-trigger[data-popup-open] {
+    background: hsl(var(--accent));
+}
+
+.note-folder-menu-trigger:focus-visible {
     outline: 1px solid hsl(var(--ring));
     outline-offset: 1px;
+}
+
+.note-folder-menu-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.note-folder-menu-trigger > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note-folder-menu-trigger > svg:first-child {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    color: hsl(var(--muted-foreground));
+}
+
+.note-folder-menu-trigger > svg:last-child {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+    color: hsl(var(--muted-foreground));
+}
+
+.note-folder-menu-popup {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 3;
+    width: max(100%, 180px);
+    max-width: min(280px, calc(100vw - 24px));
+    max-height: min(260px, var(--available-height));
+    padding: 4px;
+    overflow-y: auto;
+    border: 1px solid hsl(var(--border));
+    border-radius: 9px;
+    color: hsl(var(--popover-foreground));
+    background: hsl(var(--popover));
+    box-shadow: 0 12px 32px hsl(0 0% 0% / 0.18);
+    outline: none;
+}
+
+.note-folder-menu-item {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 5px;
+    color: inherit;
+    background: transparent;
+    font-size: 13px;
+    text-align: left;
+}
+
+.note-folder-menu-item:hover,
+.note-folder-menu-item:focus-visible {
+    outline: 0;
+    background: hsl(var(--accent));
+}
+
+.note-folder-menu-item > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note-folder-menu-indicator {
+    display: inline-flex;
+    margin-left: auto;
+    color: hsl(var(--foreground));
+}
+
+.note-folder-menu-indicator svg {
+    width: 14px;
+    height: 14px;
 }
 
 .note-send-button {
     width: 38px;
     height: 38px;
+    margin-left: auto;
     flex: 0 0 38px;
 }
 

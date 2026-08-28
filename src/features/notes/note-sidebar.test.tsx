@@ -86,7 +86,7 @@ describe('NoteSidebar', () => {
         act(() =>
             (container.querySelector('.note-card') as HTMLButtonElement).click()
         )
-        expect(document.body.textContent).toContain('查看笔记')
+        expect(document.body.querySelector('.note-view-dialog')).not.toBeNull()
         expect(document.body.querySelector('.note-view-body h1')?.textContent).toBe(
             'Markdown title'
         )
@@ -115,8 +115,10 @@ describe('NoteSidebar', () => {
             document.body.querySelector('.cm-content[aria-label="笔记内容"]')
         ).not.toBeNull()
         expect(
-            document.body.querySelector('select[aria-label="笔记文件夹"]')
-        ).toHaveProperty('value', 'folder')
+            document.body.querySelector(
+                'button[aria-label="笔记文件夹：Work"]'
+            )
+        ).not.toBeNull()
     })
 
     it('shows setup guidance and disables note actions without an API key', () => {
@@ -126,7 +128,7 @@ describe('NoteSidebar', () => {
             notes: [],
             onOpenSettings,
         })
-        expect(container.textContent).toContain('设置 API Key 后即可管理私人笔记')
+        expect(container.textContent).toContain('设置 API Key 后即可管理个人笔记')
         expect(
             (container.querySelector(
                 'button[aria-label="刷新笔记"]'
@@ -164,5 +166,113 @@ describe('NoteSidebar', () => {
         act(() => close.click())
         expect(document.body.textContent).toContain('放弃未保存的修改？')
         expect(document.body.querySelector('.note-editor-dialog')).not.toBeNull()
+    })
+
+    it('can clear the selected folder and submit an uncategorized note', async () => {
+        const {container, props} = renderSidebar()
+        act(() =>
+            (container.querySelector('.note-card') as HTMLButtonElement).click()
+        )
+        act(() =>
+            (
+                document.body.querySelector(
+                    'button[aria-label="编辑笔记"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => Promise.resolve())
+
+        act(() =>
+            (
+                document.body.querySelector(
+                    'button[aria-label="笔记文件夹：Work"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => Promise.resolve())
+        const uncategorized = Array.from(
+            document.body.querySelectorAll('.note-folder-menu-item')
+        ).find((item) => item.textContent === '不分类') as HTMLElement
+        act(() => uncategorized.click())
+
+        await act(async () => {
+            (
+                document.body.querySelector(
+                    '.note-editor-dialog button[aria-label="更新笔记"]'
+                ) as HTMLButtonElement
+            ).click()
+            await Promise.resolve()
+        })
+        expect(props.onUpdate).toHaveBeenCalledWith(
+            'one',
+            note.content,
+            null
+        )
+    })
+
+    it('can select a folder from the uncategorized state', async () => {
+        const {container} = renderSidebar({notes: []})
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="添加笔记"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => Promise.resolve())
+
+        act(() =>
+            (
+                document.body.querySelector(
+                    'button[aria-label="笔记文件夹：不分类"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => Promise.resolve())
+        const workFolder = Array.from(
+            document.body.querySelectorAll('.note-folder-menu-item')
+        ).find((item) => item.textContent === 'Work') as HTMLElement
+        act(() => workFolder.click())
+
+        expect(
+            document.body.querySelector(
+                'button[aria-label="笔记文件夹：Work"]'
+            )
+        ).not.toBeNull()
+    })
+
+    it('hides the folder menu and submits null when no folders exist', async () => {
+        const {container, props} = renderSidebar({folders: [], notes: []})
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="添加笔记"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => Promise.resolve())
+
+        expect(
+            document.body.querySelector('.note-folder-menu-trigger')
+        ).toBeNull()
+
+        const content = document.body.querySelector(
+            '.note-editor-dialog .cm-content'
+        ) as HTMLElement
+        const view = EditorView.findFromDOM(content)
+        if (!view) {
+            throw new Error('Note editor was not mounted')
+        }
+        act(() => view.dispatch({changes: {from: 0, insert: 'No folder'}}))
+
+        await act(async () => {
+            (
+                document.body.querySelector(
+                    '.note-editor-dialog button[aria-label="添加笔记"]'
+                ) as HTMLButtonElement
+            ).click()
+            await Promise.resolve()
+        })
+        expect(props.onCreate).toHaveBeenCalledWith('No folder', null)
     })
 })

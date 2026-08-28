@@ -4,9 +4,14 @@ import {
     Delete20Regular,
     Dismiss20Regular,
     Edit20Regular,
+    Folder16Regular,
     Send20Filled,
 } from '@fluentui/react-icons'
-import {ShadowInnerIcon} from '@radix-ui/react-icons'
+import {
+    CheckIcon,
+    ChevronDownIcon,
+    ShadowInnerIcon,
+} from '@radix-ui/react-icons'
 import {useEffect, useMemo, useRef, useState} from 'react'
 
 import {
@@ -98,6 +103,110 @@ interface NoteEditorDialogProps {
     open: boolean
 }
 
+interface NoteFolderMenuProps {
+    disabled: boolean
+    folders: NoteFolder[]
+    onChange: (folderId: string) => void
+    value: string
+}
+
+function NoteFolderMenu({
+    disabled,
+    folders,
+    onChange,
+    value,
+}: NoteFolderMenuProps) {
+    const [open, setOpen] = useState(false)
+    const rootRef = useRef<HTMLDivElement>(null)
+    const selectedFolder = folders.find((folder) => folder.id === value)
+    const selectedLabel = selectedFolder?.name ?? '不分类'
+
+    useEffect(() => {
+        if (!open) {
+            return
+        }
+        const closeOutside = (event: PointerEvent) => {
+            if (!rootRef.current?.contains(event.target as Node)) {
+                setOpen(false)
+            }
+        }
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setOpen(false)
+            }
+        }
+        document.addEventListener('pointerdown', closeOutside)
+        document.addEventListener('keydown', closeOnEscape)
+        return () => {
+            document.removeEventListener('pointerdown', closeOutside)
+            document.removeEventListener('keydown', closeOnEscape)
+        }
+    }, [open])
+
+    const selectFolder = (nextFolderId: string) => {
+        onChange(nextFolderId)
+        setOpen(false)
+    }
+
+    return (
+        <div ref={rootRef} className="note-folder-menu">
+            <button
+                type="button"
+                className="note-folder-menu-trigger"
+                aria-label={`笔记文件夹：${selectedLabel}`}
+                aria-expanded={open}
+                aria-haspopup="listbox"
+                title={selectedLabel}
+                disabled={disabled}
+                onClick={() => setOpen((current) => !current)}
+            >
+                <Folder16Regular aria-hidden="true" />
+                <span>{selectedLabel}</span>
+                <ChevronDownIcon aria-hidden="true" />
+            </button>
+            {open && (
+                <div
+                    className="note-folder-menu-popup"
+                    role="listbox"
+                    aria-label="笔记文件夹"
+                >
+                    <button
+                        type="button"
+                        role="option"
+                        aria-selected={value === ''}
+                        className="note-folder-menu-item"
+                        onClick={() => selectFolder('')}
+                    >
+                        <span>不分类</span>
+                        {value === '' && (
+                            <span className="note-folder-menu-indicator">
+                                <CheckIcon aria-hidden="true" />
+                            </span>
+                        )}
+                    </button>
+                    {folders.map((folder) => (
+                        <button
+                            type="button"
+                            role="option"
+                            aria-selected={folder.id === value}
+                            className="note-folder-menu-item"
+                            key={folder.id}
+                            onClick={() => selectFolder(folder.id)}
+                        >
+                            <span>{folder.name}</span>
+                            {folder.id === value && (
+                                <span className="note-folder-menu-indicator">
+                                    <CheckIcon aria-hidden="true" />
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
 function NoteEditorDialog({
     folders,
     mode,
@@ -177,24 +286,14 @@ function NoteEditorDialog({
                         placeholder="记录点什么..."
                     />
                     <footer className="note-editor-footer">
-                        <label className="note-folder-select-label">
-                            <span className="sr-only">笔记文件夹</span>
-                            <select
-                                aria-label="笔记文件夹"
-                                value={folderId}
+                        {selectableFolders.length > 0 && (
+                            <NoteFolderMenu
+                                folders={selectableFolders}
                                 disabled={mutating}
-                                onChange={(event) =>
-                                    setFolderId(event.target.value)
-                                }
-                            >
-                                <option value="">不分类</option>
-                                {selectableFolders.map((folder) => (
-                                    <option value={folder.id} key={folder.id}>
-                                        {folder.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                                value={folderId}
+                                onChange={setFolderId}
+                            />
+                        )}
                         <Button
                             type="button"
                             size="icon"
