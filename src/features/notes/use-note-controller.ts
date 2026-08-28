@@ -6,12 +6,15 @@ import {
     type Note,
     type NoteClient,
     type NoteFolder,
+    type NoteQuery,
 } from './note-client'
 
 const HOUR = 60 * 60 * 1000
 
 export const NOTE_CACHE_TTL = 4 * HOUR
 export const NOTE_FOLDER_CACHE_TTL = 8 * HOUR
+
+const EMPTY_NOTE_QUERY: NoteQuery = {keyword: '', folderIds: []}
 
 interface NoteControllerOptions {
     accessToken: string
@@ -26,6 +29,23 @@ interface NoteControllerOptions {
 function isValidCache(fetchedAt: number, ttl: number, timestamp: number) {
     const age = timestamp - fetchedAt
     return age >= 0 && age <= ttl
+}
+
+function normalizeNoteQuery(query: NoteQuery): NoteQuery {
+    return {
+        keyword: query.keyword.trim(),
+        folderIds: [
+            ...new Set(
+                query.folderIds
+                    .map((folderId) => folderId.trim())
+                    .filter(Boolean)
+            ),
+        ],
+    }
+}
+
+function isEmptyNoteQuery(query: NoteQuery) {
+    return !query.keyword && query.folderIds.length === 0
 }
 
 export function useNoteController({
@@ -46,14 +66,19 @@ export function useNoteController({
     const [moreError, setMoreError] = useState<string | null>(null)
     const [hasMore, setHasMore] = useState(false)
     const [mutating, setMutating] = useState(false)
+    const [query, setQuery] = useState<NoteQuery>(EMPTY_NOTE_QUERY)
     const notesRef = useRef<Note[]>([])
     const foldersRef = useRef<NoteFolder[]>([])
+    const queryRef = useRef<NoteQuery>(EMPTY_NOTE_QUERY)
     const pageRef = useRef(0)
     const hasMoreRef = useRef(false)
     const startedRef = useRef(false)
     const generationRef = useRef(0)
+    const listGenerationRef = useRef(0)
     const firstPageBusyRef = useRef(false)
+    const firstPageControllerRef = useRef<AbortController | null>(null)
     const loadingMoreRef = useRef(false)
+    const loadingMoreControllerRef = useRef<AbortController | null>(null)
     const refreshingRef = useRef(false)
     const mutatingRef = useRef(false)
     const onErrorRef = useRef(onError)
@@ -91,6 +116,7 @@ export function useNoteController({
 
     useEffect(() => {
         generationRef.current += 1
+        listGenerationRef.current += 1
         startedRef.current = false
         firstPageBusyRef.current = false
         loadingMoreRef.current = false
@@ -98,9 +124,13 @@ export function useNoteController({
         mutatingRef.current = false
         abortControllersRef.current.forEach((controller) => controller.abort())
         abortControllersRef.current.clear()
+        firstPageControllerRef.current = null
+        loadingMoreControllerRef.current = null
         setCurrentNotes([])
         setCurrentFolders([])
         setCurrentHasMore(false)
+        queryRef.current = EMPTY_NOTE_QUERY
+        setQuery(EMPTY_NOTE_QUERY)
         pageRef.current = 0
         setLoading(false)
         setLoadingMore(false)
@@ -120,8 +150,13 @@ export function useNoteController({
     )
 
     const saveFirstPage = useCallback(
-        (nextNotes: Note[], nextHasMore: boolean, fetchedAt: number) => {
-            if (!accessToken) {
+        (
+            nextNotes: Note[],
+            nextHasMore: boolean,
+            fetchedAt: number,
+            noteQuery: NoteQuery
+        ) => {
+            if (!accessToken || !isEmptyNoteQuery(noteQuery)) {
                 return
             }
             void cacheRepository
@@ -137,7 +172,11 @@ export function useNoteController({
     )
 
     const fetchFirstPage = useCallback(
-        async (showRefreshState: boolean, preserve: Note[] = []) => {
+        async (
+            showRefreshState: boolean,
+            preserve: Note[] = [],
+            noteQuery: NoteQuery = queryRef.current
+        ) => {
             if (
                 !enabled ||
                 !accessToken ||
@@ -148,8 +187,10 @@ export function useNoteController({
             }
             firstPageBusyRef.current = true
             const generation = generationRef.current
+            const listGeneration = listGenerationRef.current
             const hadNotes = notesRef.current.length > 0
             const controller = createAbortController()
+            firstPageControllerRef.current = controller
             setError(null)
             setMoreError(null)
             if (!hadNotes) {
@@ -162,12 +203,14 @@ export function useNoteController({
             try {
                 const result = await client.list(
                     1,
+                    noteQuery,
                     accessToken,
                     controller.signal
                 )
                 if (
                     controller.signal.aborted ||
-                    generation !== generationRef.current
+                    generation !== generationRef.current ||
+                    listGeneration !== listGenerationRef.current
                 ) {
                     return false
                 }
@@ -180,12 +223,18 @@ export function useNoteController({
                 setCurrentHasMore(result.meta.hasMore)
                 pageRef.current = result.meta.page
                 setLoading(false)
-                saveFirstPage(nextNotes, result.meta.hasMore, now())
+                saveFirstPage(
+                    nextNotes,
+                    result.meta.hasMore,
+                    now(),
+                    noteQuery
+                )
                 return true
             } catch (requestError) {
                 if (
                     controller.signal.aborted ||
-                    generation !== generationRef.current
+                    generation !== generationRef.current ||
+                    listGeneration !== listGenerationRef.current
                 ) {
                     return false
                 }
@@ -201,7 +250,11 @@ export function useNoteController({
                 return false
             } finally {
                 releaseAbortController(controller)
-                if (generation === generationRef.current) {
+                if (
+                    generation === generationRef.current &&
+                    listGeneration === listGenerationRef.current
+                ) {
+                    firstPageControllerRef.current = null
                     firstPageBusyRef.current = false
                     if (showRefreshState) {
                         refreshingRef.current = false
@@ -270,6 +323,7 @@ export function useNoteController({
         }
         startedRef.current = true
         const generation = generationRef.current
+        const listGeneration = listGenerationRef.current
         setLoading(true)
 
         void cacheRepository
@@ -279,6 +333,8 @@ export function useNoteController({
                 if (generation !== generationRef.current) {
                     return
                 }
+                const listQueryUnchanged =
+                    listGeneration === listGenerationRef.current
                 const timestamp = now()
                 const validNotes = Boolean(
                     snapshot &&
@@ -296,7 +352,7 @@ export function useNoteController({
                             timestamp
                         )
                 )
-                if (snapshot && validNotes) {
+                if (snapshot && validNotes && listQueryUnchanged) {
                     setCurrentNotes(snapshot.notes)
                     setCurrentHasMore(snapshot.notesHasMore)
                     pageRef.current = 1
@@ -306,7 +362,10 @@ export function useNoteController({
                     setCurrentFolders(snapshot.folders)
                 }
 
-                const tasks: Promise<boolean>[] = [fetchFirstPage(false)]
+                const tasks: Promise<boolean>[] = []
+                if (listQueryUnchanged) {
+                    tasks.push(fetchFirstPage(false))
+                }
                 if (!validFolders) {
                     tasks.push(fetchFolders(true))
                 }
@@ -358,16 +417,20 @@ export function useNoteController({
         setLoadingMore(true)
         setMoreError(null)
         const generation = generationRef.current
+        const listGeneration = listGenerationRef.current
         const controller = createAbortController()
+        loadingMoreControllerRef.current = controller
         try {
             const result = await client.list(
                 pageRef.current + 1,
+                queryRef.current,
                 accessToken,
                 controller.signal
             )
             if (
                 controller.signal.aborted ||
-                generation !== generationRef.current
+                generation !== generationRef.current ||
+                listGeneration !== listGenerationRef.current
             ) {
                 return
             }
@@ -382,7 +445,8 @@ export function useNoteController({
         } catch (requestError) {
             if (
                 controller.signal.aborted ||
-                generation !== generationRef.current
+                generation !== generationRef.current ||
+                listGeneration !== listGenerationRef.current
             ) {
                 return
             }
@@ -393,12 +457,45 @@ export function useNoteController({
             )
         } finally {
             releaseAbortController(controller)
-            if (generation === generationRef.current) {
+            if (
+                generation === generationRef.current &&
+                listGeneration === listGenerationRef.current
+            ) {
+                loadingMoreControllerRef.current = null
                 loadingMoreRef.current = false
                 setLoadingMore(false)
             }
         }
     }, [accessToken, client, enabled, setCurrentHasMore, setCurrentNotes])
+
+    const search = useCallback(
+        async (nextQuery: NoteQuery) => {
+            if (!enabled || !accessToken) {
+                return false
+            }
+            const normalized = normalizeNoteQuery(nextQuery)
+            listGenerationRef.current += 1
+            firstPageControllerRef.current?.abort()
+            loadingMoreControllerRef.current?.abort()
+            firstPageControllerRef.current = null
+            loadingMoreControllerRef.current = null
+            firstPageBusyRef.current = false
+            loadingMoreRef.current = false
+            refreshingRef.current = false
+            queryRef.current = normalized
+            setQuery(normalized)
+            pageRef.current = 0
+            setCurrentNotes([])
+            setCurrentHasMore(false)
+            setError(null)
+            setMoreError(null)
+            setLoadingMore(false)
+            setRefreshing(false)
+            setLoading(true)
+            return fetchFirstPage(false, [], normalized)
+        },
+        [accessToken, enabled, fetchFirstPage, setCurrentHasMore, setCurrentNotes]
+    )
 
     const createNote = useCallback(
         async (content: string, folderId: string | null) => {
@@ -419,13 +516,25 @@ export function useNoteController({
                     folder,
                     comments: [],
                 }
-                const next = [
-                    optimistic,
-                    ...notesRef.current.filter((note) => note.id !== id),
-                ]
+                const filtered = !isEmptyNoteQuery(queryRef.current)
+                const next = filtered
+                    ? notesRef.current
+                    : [
+                          optimistic,
+                          ...notesRef.current.filter((note) => note.id !== id),
+                      ]
                 setCurrentNotes(next)
-                saveFirstPage(next, hasMoreRef.current, now())
-                void fetchFirstPage(false, [optimistic])
+                saveFirstPage(
+                    next,
+                    hasMoreRef.current,
+                    now(),
+                    queryRef.current
+                )
+                void fetchFirstPage(
+                    false,
+                    filtered ? [] : [optimistic],
+                    queryRef.current
+                )
                 return true
             } catch (requestError) {
                 onErrorRef.current(
@@ -458,7 +567,15 @@ export function useNoteController({
                     note.id === noteId ? {...note, content, folder} : note
                 )
                 setCurrentNotes(next)
-                saveFirstPage(next, hasMoreRef.current, now())
+                saveFirstPage(
+                    next,
+                    hasMoreRef.current,
+                    now(),
+                    queryRef.current
+                )
+                if (!isEmptyNoteQuery(queryRef.current)) {
+                    void fetchFirstPage(false, [], queryRef.current)
+                }
                 return true
             } catch (requestError) {
                 onErrorRef.current(
@@ -472,7 +589,15 @@ export function useNoteController({
                 setMutating(false)
             }
         },
-        [accessToken, client, enabled, now, saveFirstPage, setCurrentNotes]
+        [
+            accessToken,
+            client,
+            enabled,
+            fetchFirstPage,
+            now,
+            saveFirstPage,
+            setCurrentNotes,
+        ]
     )
 
     const removeNote = useCallback(
@@ -486,7 +611,15 @@ export function useNoteController({
                 await client.remove(noteId, accessToken)
                 const next = notesRef.current.filter((note) => note.id !== noteId)
                 setCurrentNotes(next)
-                saveFirstPage(next, hasMoreRef.current, now())
+                saveFirstPage(
+                    next,
+                    hasMoreRef.current,
+                    now(),
+                    queryRef.current
+                )
+                if (!isEmptyNoteQuery(queryRef.current)) {
+                    void fetchFirstPage(false, [], queryRef.current)
+                }
                 return true
             } catch (requestError) {
                 onErrorRef.current(
@@ -500,7 +633,15 @@ export function useNoteController({
                 setMutating(false)
             }
         },
-        [accessToken, client, enabled, now, saveFirstPage, setCurrentNotes]
+        [
+            accessToken,
+            client,
+            enabled,
+            fetchFirstPage,
+            now,
+            saveFirstPage,
+            setCurrentNotes,
+        ]
     )
 
     return {
@@ -514,10 +655,12 @@ export function useNoteController({
         moreError,
         mutating,
         notes,
+        query,
         refresh,
         refreshing,
         removeNote,
         retry: moreError ? loadMore : () => fetchFirstPage(true),
+        search,
         updateNote,
     }
 }

@@ -935,7 +935,9 @@ export default function App() {
                     onRefresh={() => void notes.refresh()}
                     onRemove={notes.removeNote}
                     onRetry={() => void notes.retry()}
+                    onSearch={(query) => void notes.search(query)}
                     onUpdate={notes.updateNote}
+                    query={notes.query}
                     refreshing={notes.refreshing}
                 />
             }

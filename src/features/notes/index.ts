@@ -1,5 +1,5 @@
 export {createNoteCacheRepository} from './note-cache-repository'
 export {createNoteClient} from './note-client'
-export type {Note, NoteComment, NoteFolder} from './note-client'
+export type {Note, NoteComment, NoteFolder, NoteQuery} from './note-client'
 export {default as NoteSidebar} from './note-sidebar'
 export {useNoteController} from './use-note-controller'

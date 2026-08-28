@@ -42,12 +42,23 @@ function renderSidebar(overrides: Partial<Parameters<typeof NoteSidebar>[0]> = {
         onRefresh: vi.fn(),
         onRemove: vi.fn(async () => true),
         onRetry: vi.fn(),
+        onSearch: vi.fn(),
         onUpdate: vi.fn(async () => true),
+        query: {keyword: '', folderIds: []},
         refreshing: false,
         ...overrides,
     }
     act(() => root.render(<NoteSidebar {...props} />))
     return {container, props}
+}
+
+function setInputValue(input: HTMLInputElement, value: string) {
+    const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value'
+    )?.set
+    setter?.call(input, value)
+    input.dispatchEvent(new Event('input', {bubbles: true}))
 }
 
 afterEach(() => {
@@ -285,5 +296,109 @@ describe('NoteSidebar', () => {
             await Promise.resolve()
         })
         expect(props.onCreate).toHaveBeenCalledWith('No folder', null)
+    })
+
+    it('submits keyword searches and clears each active filter', () => {
+        const {container, props} = renderSidebar({
+            query: {keyword: 'topic', folderIds: ['folder']},
+        })
+        const input = container.querySelector(
+            'input[aria-label="搜索笔记"]'
+        ) as HTMLInputElement
+
+        act(() => setInputValue(input, 'first,second'))
+        act(() =>
+            input.closest('form')?.dispatchEvent(
+                new Event('submit', {bubbles: true, cancelable: true})
+            )
+        )
+        expect(props.onSearch).toHaveBeenLastCalledWith({
+            keyword: 'first,second',
+            folderIds: ['folder'],
+        })
+
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="清空关键词"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        expect(props.onSearch).toHaveBeenLastCalledWith({
+            keyword: '',
+            folderIds: ['folder'],
+        })
+
+        expect(container.querySelector('.note-folder-filter-badge')?.textContent)
+            .toBe('1')
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="清空文件夹筛选"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        expect(props.onSearch).toHaveBeenLastCalledWith({
+            keyword: '',
+            folderIds: [],
+        })
+    })
+
+    it('confirms combined folder filters and discards unconfirmed changes', () => {
+        const {container, props} = renderSidebar({
+            query: {keyword: 'topic', folderIds: []},
+        })
+        const trigger = container.querySelector(
+            'button[aria-label="按文件夹筛选"]'
+        ) as HTMLButtonElement
+
+        act(() => trigger.click())
+        const options = Array.from(
+            container.querySelectorAll<HTMLButtonElement>(
+                '.note-folder-filter-option'
+            )
+        )
+        const unclassified = options.find(
+            (option) => option.textContent === '未分类'
+        )!
+        const work = options.find((option) => option.textContent === 'Work')!
+        act(() => {
+            unclassified.click()
+            work.click()
+        })
+        const confirm = Array.from(
+            container.querySelectorAll<HTMLButtonElement>('button')
+        ).find((button) => button.textContent === '确定')!
+        act(() => confirm.click())
+        expect(props.onSearch).toHaveBeenLastCalledWith({
+            keyword: 'topic',
+            folderIds: ['unclassified', 'folder'],
+        })
+
+        act(() => trigger.click())
+        const reopenedWork = Array.from(
+            container.querySelectorAll<HTMLButtonElement>(
+                '.note-folder-filter-option'
+            )
+        ).find((option) => option.textContent === 'Work')!
+        act(() => reopenedWork.click())
+        act(() => document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'})))
+        act(() => trigger.click())
+        const resetWork = Array.from(
+            container.querySelectorAll<HTMLButtonElement>(
+                '.note-folder-filter-option'
+            )
+        ).find((option) => option.textContent === 'Work')!
+        expect(resetWork.getAttribute('aria-checked')).toBe('false')
+    })
+
+    it('shows a filtered empty state without the create shortcut', () => {
+        const {container} = renderSidebar({
+            notes: [],
+            query: {keyword: 'missing', folderIds: []},
+        })
+
+        expect(container.textContent).toContain('未找到匹配的笔记')
+        expect(container.textContent).not.toContain('添加第一条笔记')
     })
 })

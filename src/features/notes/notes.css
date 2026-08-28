@@ -15,6 +15,176 @@
     border-bottom: 1px solid hsl(var(--border-secondary));
 }
 
+.note-search-controls {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 3px;
+}
+
+.note-keyword-search {
+    position: relative;
+    min-width: 0;
+    flex: 1;
+}
+
+.note-keyword-input.note-keyword-input {
+    @apply rounded-full bg-secondary;
+    height: 30px;
+    min-width: 0;
+    padding: 4px 27px 4px 9px;
+    border:none;
+    font-size: 12px;
+    box-shadow: none;
+}
+
+.note-folder-filter-trigger
+ {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    color: hsl(var(--muted-foreground));
+    background: transparent;
+}
+
+.note-search-clear {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 27px;
+    height: 28px;
+}
+
+
+.note-search-clear:disabled,
+.note-folder-filter-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.note-search-clear svg {
+    width: 15px;
+    height: 15px;
+}
+
+.note-folder-filter {
+    position: static;
+    display: flex;
+    flex: 0 0 auto;
+}
+
+.note-folder-filter-trigger {
+    position: relative;
+}
+
+.note-folder-filter-trigger > svg {
+    width: 17px;
+    height: 17px;
+}
+
+.note-folder-filter-badge {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    display: inline-flex;
+    min-width: 15px;
+    height: 15px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 1.5px solid hsl(var(--main-background));
+    border-radius: 999px;
+    color: hsl(var(--primary-foreground));
+    background: hsl(var(--primary));
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.note-folder-filter-popup {
+    position: absolute;
+    z-index: 80;
+    top: calc(100% + 7px);
+    left: 0;
+    width: min(220px, calc(100vw - 24px));
+    padding: 5px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    color: hsl(var(--popover-foreground));
+    background: hsl(var(--popover));
+    box-shadow: 0 10px 30px hsl(0 0% 0% / 0.18);
+}
+
+.note-folder-filter-options {
+    max-height: min(280px, calc(100vh - 130px));
+    overflow-y: auto;
+}
+
+.note-folder-filter-option {
+    display: flex;
+    width: 100%;
+    min-height: 32px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 5px;
+    color: inherit;
+    background: transparent;
+    font-size: 12px;
+    text-align: left;
+}
+
+.note-folder-filter-option:hover,
+.note-folder-filter-option:focus-visible {
+    outline: 0;
+    background: hsl(var(--accent));
+}
+
+.note-folder-filter-option > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note-folder-filter-check {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid hsl(var(--border));
+    border-radius: 4px;
+}
+
+.note-folder-filter-option[aria-checked='true'] .note-folder-filter-check {
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    background: hsl(var(--primary));
+}
+
+.note-folder-filter-check svg {
+    width: 12px;
+    height: 12px;
+}
+
+.note-folder-filter-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px 2px 1px;
+    border-top: 1px solid hsl(var(--border-secondary));
+}
+
+.note-folder-filter-footer button {
+    height: 28px;
+}
+
 .note-sidebar-title {
     color: hsl(var(--foreground));
     font-size: 13px;
@@ -276,7 +446,7 @@
     flex-direction: column;
     gap: 9px;
     padding: 14px 12px;
-    border: 1px solid hsl(var(--border));
+    border: 1px solid hsl(var(--border-secondary));
     border-radius: 9px;
 }
 

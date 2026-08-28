@@ -35,7 +35,9 @@ describe('NoteClient', () => {
             httpClient,
         })
 
-        await expect(client.list(2, 'token')).resolves.toEqual({
+        await expect(
+            client.list(2, {keyword: '', folderIds: []}, 'token')
+        ).resolves.toEqual({
             meta: {page: 2, limit: 20, hasMore: true},
             data: [
                 {
@@ -60,6 +62,35 @@ describe('NoteClient', () => {
                 headers: {Authorization: 'Bearer token'},
                 signal: undefined,
             }
+        )
+    })
+
+    it('adds keyword and folder filters to list requests', async () => {
+        const httpClient = vi.fn(async () =>
+            response(
+                JSON.stringify({
+                    meta: {page: 1, limit: 20, hasMore: false},
+                    data: [],
+                })
+            )
+        )
+        const client = createNoteClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient,
+        })
+
+        await client.list(
+            1,
+            {
+                keyword: ' first,second ',
+                folderIds: ['folder-1', 'unclassified'],
+            },
+            'token'
+        )
+
+        expect(httpClient).toHaveBeenCalledWith(
+            'https://api.essay.ink/notes?page=1&limit=20&keyword=first%2Csecond&folderIds=folder-1%2Cunclassified',
+            expect.objectContaining({method: 'GET'})
         )
     })
 
@@ -127,9 +158,9 @@ describe('NoteClient', () => {
             },
         })
 
-        await expect(malformed.list(1, 'token')).rejects.toThrow(
-            '服务器返回了无效的笔记列表'
-        )
+        await expect(
+            malformed.list(1, {keyword: '', folderIds: []}, 'token')
+        ).rejects.toThrow('服务器返回了无效的笔记列表')
         await expect(offline.listFolders('token')).rejects.toEqual(
             expect.any(NoteClientError)
         )

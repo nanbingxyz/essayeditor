@@ -30,6 +30,11 @@ export interface NotePage {
     }
 }
 
+export interface NoteQuery {
+    keyword: string
+    folderIds: string[]
+}
+
 export interface NoteClient {
     create: (
         content: string,
@@ -39,6 +44,7 @@ export interface NoteClient {
     ) => Promise<string>
     list: (
         page: number,
+        query: NoteQuery,
         accessToken: string,
         signal?: AbortSignal
     ) => Promise<NotePage>
@@ -304,11 +310,21 @@ export function createNoteClient({
             }
             return id.trim()
         },
-        list: async (page, accessToken, signal) => {
+        list: async (page, noteQuery, accessToken, signal) => {
             const query = new URLSearchParams({
                 page: String(page),
                 limit: String(NOTE_PAGE_SIZE),
             })
+            const keyword = noteQuery.keyword.trim()
+            const folderIds = noteQuery.folderIds
+                .map((folderId) => folderId.trim())
+                .filter(Boolean)
+            if (keyword) {
+                query.set('keyword', keyword)
+            }
+            if (folderIds.length > 0) {
+                query.set('folderIds', folderIds.join(','))
+            }
             const response = await request(
                 `${notesUrl}?${query}`,
                 accessToken,

@@ -2,9 +2,9 @@ import {
     AddRegular,
     ArrowClockwiseRegular,
     Delete20Regular,
-    Dismiss20Regular,
+    DismissCircle16Filled,
     Edit20Regular,
-    Folder16Regular,
+    FolderSearch16Regular,
     Send20Filled,
 } from '@fluentui/react-icons'
 import {
@@ -12,17 +12,31 @@ import {
     ChevronDownIcon,
     ShadowInnerIcon,
 } from '@radix-ui/react-icons'
-import {useEffect, useMemo, useRef, useState} from 'react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
     MarkdownEditor,
     type MarkdownEditorHandle,
 } from '@/features/editor'
-import {Button, Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, GridPatternCard, GridPatternCardBody, useToast} from '@/shared/ui'
+import {
+    Button,
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    GridPatternCard,
+    GridPatternCardBody,
+    Input,
+    useToast,
+} from '@/shared/ui'
 
 import MarkdownPreview from './markdown-preview'
-import type {Note, NoteFolder} from './note-client'
+import type { Note, NoteFolder, NoteQuery } from './note-client'
 import './notes.css'
+import { cn } from '@/shared/lib'
 
 interface NoteSidebarProps {
     enabled: boolean
@@ -40,11 +54,13 @@ interface NoteSidebarProps {
     onRefresh: () => void
     onRemove: (noteId: string) => Promise<boolean>
     onRetry: () => void
+    onSearch: (query: NoteQuery) => void
     onUpdate: (
         noteId: string,
         content: string,
         folderId: string | null
     ) => Promise<boolean>
+    query: NoteQuery
     refreshing: boolean
 }
 
@@ -64,7 +80,7 @@ function formatTimestamp(value: string) {
 function NoteSkeleton() {
     return (
         <div className="note-list-skeleton" aria-label="正在加载笔记">
-            {Array.from({length: 4}, (_, index) => (
+            {Array.from({ length: 4 }, (_, index) => (
                 <div className="note-card-skeleton" key={index}>
                     <span />
                     <span />
@@ -75,7 +91,7 @@ function NoteSkeleton() {
     )
 }
 
-function CommentList({note, full = false}: {note: Note; full?: boolean}) {
+function CommentList({ note, full = false }: { note: Note; full?: boolean }) {
     if (note.comments.length === 0) {
         return null
     }
@@ -89,6 +105,177 @@ function CommentList({note, full = false}: {note: Note; full?: boolean}) {
                     </time>
                 </div>
             ))}
+        </div>
+    )
+}
+
+interface NoteSearchControlsProps {
+    disabled: boolean
+    folders: NoteFolder[]
+    onSearch: (query: NoteQuery) => void
+    query: NoteQuery
+}
+
+function NoteSearchControls({
+    disabled,
+    folders,
+    onSearch,
+    query,
+}: NoteSearchControlsProps) {
+    const [keyword, setKeyword] = useState(query.keyword)
+    const [folderOpen, setFolderOpen] = useState(false)
+    const [draftFolderIds, setDraftFolderIds] = useState<string[]>(
+        query.folderIds
+    )
+    const folderRootRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        setKeyword(query.keyword)
+    }, [query.keyword])
+
+    useEffect(() => {
+        if (!folderOpen) {
+            return
+        }
+        const closeOutside = (event: PointerEvent) => {
+            if (!folderRootRef.current?.contains(event.target as Node)) {
+                setFolderOpen(false)
+            }
+        }
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setFolderOpen(false)
+            }
+        }
+        document.addEventListener('pointerdown', closeOutside)
+        document.addEventListener('keydown', closeOnEscape)
+        return () => {
+            document.removeEventListener('pointerdown', closeOutside)
+            document.removeEventListener('keydown', closeOnEscape)
+        }
+    }, [folderOpen])
+
+    const openFolderFilter = () => {
+        if (folderOpen) {
+            setFolderOpen(false)
+            return
+        }
+        setDraftFolderIds(query.folderIds)
+        setFolderOpen(true)
+    }
+
+    const toggleFolder = (folderId: string) => {
+        setDraftFolderIds((current) =>
+            current.includes(folderId)
+                ? current.filter((id) => id !== folderId)
+                : [...current, folderId]
+        )
+    }
+
+    const submitKeyword = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        onSearch({ keyword, folderIds: query.folderIds })
+    }
+
+    const clearKeyword = () => {
+        setKeyword('')
+        onSearch({ keyword: '', folderIds: query.folderIds })
+    }
+
+    const confirmFolders = () => {
+        setFolderOpen(false)
+        onSearch({ keyword, folderIds: draftFolderIds })
+    }
+
+    const folderOptions = [
+        { id: 'unclassified', name: '未分类' },
+        ...folders,
+    ]
+
+    return (
+        <div className="note-search-controls">
+            <form className="note-keyword-search" onSubmit={submitKeyword}>
+                <Input
+                    type="text"
+                    aria-label="搜索笔记"
+                    autoComplete="off"
+                    className="note-keyword-input focus-visible:ring-0"
+                    disabled={disabled}
+                    placeholder="搜索笔记"
+                    value={keyword}
+                    onChange={(event) => setKeyword(event.target.value)}
+                />
+                {keyword.length > 0 && (
+                    <button
+                        type="button"
+                        className="note-search-clear"
+                        aria-label="清空关键词"
+                        title="清空关键词"
+                        disabled={disabled}
+                        onClick={clearKeyword}
+                    >
+                        <DismissCircle16Filled aria-hidden="true" />
+                    </button>
+                )}
+            </form>
+
+            <div ref={folderRootRef} className="note-folder-filter">
+                <button
+                    type="button"
+                    className="note-folder-filter-trigger"
+                    aria-label="按文件夹筛选"
+                    aria-expanded={folderOpen}
+                    aria-haspopup="dialog"
+                    title="按文件夹筛选"
+                    disabled={disabled}
+                    onClick={openFolderFilter}
+                >
+                    <FolderSearch16Regular aria-hidden="true" />
+                    {query.folderIds.length > 0 && (
+                        <span className="note-folder-filter-badge">
+                            {query.folderIds.length}
+                        </span>
+                    )}
+                </button>
+                {folderOpen && (
+                    <div
+                        className="note-folder-filter-popup"
+                        role="dialog"
+                        aria-label="筛选笔记文件夹"
+                    >
+                        <div className="note-folder-filter-options">
+                            {folderOptions.map((folder) => {
+                                const selected = draftFolderIds.includes(folder.id)
+                                return (
+                                    <button
+                                        type="button"
+                                        role="checkbox"
+                                        aria-checked={selected}
+                                        className="note-folder-filter-option"
+                                        key={folder.id}
+                                        onClick={() => toggleFolder(folder.id)}
+                                    >
+                                        <span>{folder.name}</span>
+                                        <span className="note-folder-filter-check">
+                                            {selected && <CheckIcon aria-hidden="true" />}
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        <div className="note-folder-filter-footer my-2">
+                            <Button
+                                type="button"
+                                className='w-full'
+                                size="sm"
+                                onClick={confirmFolders}
+                            >
+                                {draftFolderIds.length > 0 ? '按文件夹过滤' : '确定'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }
@@ -225,7 +412,7 @@ function NoteEditorDialog({
     const selectableFolders = useMemo(
         () =>
             note?.folder &&
-            !folders.some((folder) => folder.id === note.folder?.id)
+                !folders.some((folder) => folder.id === note.folder?.id)
                 ? [note.folder, ...folders]
                 : folders,
         [folders, note?.folder]
@@ -362,10 +549,12 @@ export default function NoteSidebar({
     onRefresh,
     onRemove,
     onRetry,
+    onSearch,
     onUpdate,
+    query,
     refreshing,
 }: NoteSidebarProps) {
-    const {toast} = useToast()
+    const { toast } = useToast()
     const listRef = useRef<HTMLDivElement>(null)
     const sentinelRef = useRef<HTMLDivElement>(null)
     const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create')
@@ -375,6 +564,9 @@ export default function NoteSidebar({
     const viewingNote = useMemo(
         () => notes.find((note) => note.id === viewingId) ?? null,
         [notes, viewingId]
+    )
+    const hasActiveQuery = Boolean(
+        query.keyword || query.folderIds.length > 0
     )
 
     useEffect(() => {
@@ -389,7 +581,7 @@ export default function NoteSidebar({
                     onLoadMore()
                 }
             },
-            {root, rootMargin: '0px 0px 160px'}
+            { root, rootMargin: '0px 0px 160px' }
         )
         observer.observe(sentinel)
         return () => observer.disconnect()
@@ -425,7 +617,7 @@ export default function NoteSidebar({
                     ? await onUpdate(viewingNote.id, content, folderId)
                     : false
         if (succeeded) {
-            toast({title: editorMode === 'create' ? '笔记已添加' : '笔记已更新'})
+            toast({ title: editorMode === 'create' ? '笔记已添加' : '笔记已更新' })
         }
         return succeeded
     }
@@ -436,7 +628,7 @@ export default function NoteSidebar({
         }
         setDeleteOpen(false)
         setViewingId(null)
-        toast({title: '笔记已删除'})
+        toast({ title: '笔记已删除' })
     }
 
     return (
@@ -445,9 +637,12 @@ export default function NoteSidebar({
                 data-tauri-drag-region
                 className="titlebar-surface note-sidebar-header"
             >
-                <span data-tauri-drag-region className="note-sidebar-title">
-                    笔记
-                </span>
+                <NoteSearchControls
+                    disabled={!enabled}
+                    folders={folders}
+                    onSearch={onSearch}
+                    query={query}
+                />
                 <div className="note-sidebar-actions">
                     <Button
                         type="button"
@@ -496,10 +691,16 @@ export default function NoteSidebar({
                         </div>
                     ) : notes.length === 0 ? (
                         <div className="note-list-message">
-                            <span>还没有笔记</span>
-                            <button type="button" onClick={beginCreate}>
-                                添加第一条笔记
-                            </button>
+                            {hasActiveQuery ? (
+                                <span>未找到匹配的笔记</span>
+                            ) : (
+                                <>
+                                    <span>还没有笔记</span>
+                                    <button type="button" onClick={beginCreate}>
+                                        添加第一条笔记
+                                    </button>
+                                </>
+                            )}
                         </div>
                     ) : (
                         <div className="note-list">
@@ -607,7 +808,7 @@ export default function NoteSidebar({
                                         title="关闭"
                                         disabled={mutating}
                                     >
-                                        <Dismiss20Regular />
+                                        <DismissCircle16Filled />
                                     </Button>
                                 </DialogClose>
                             </div>
