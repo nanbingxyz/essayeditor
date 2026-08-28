@@ -2,6 +2,7 @@ import {
     AddRegular,
     ArrowClockwiseRegular,
     Delete20Regular,
+    Dismiss20Regular,
     Edit20Regular,
     Send20Filled,
 } from '@fluentui/react-icons'
@@ -12,7 +13,7 @@ import {
     MarkdownEditor,
     type MarkdownEditorHandle,
 } from '@/features/editor'
-import {Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, useToast} from '@/shared/ui'
+import {Button, Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, useToast} from '@/shared/ui'
 
 import MarkdownPreview from './markdown-preview'
 import type {Note, NoteFolder} from './note-client'
@@ -456,13 +457,16 @@ export default function NoteSidebar({
                 open={Boolean(viewingNote)}
                 onOpenChange={(next) => !next && !mutating && setViewingId(null)}
             >
-                <DialogContent className="note-view-dialog">
+                <DialogContent
+                    className="note-view-dialog"
+                    showCloseButton={false}
+                >
                     <DialogHeader>
                         <div className="note-view-heading">
                             <div>
-                                <DialogTitle>查看笔记</DialogTitle>
+                                <DialogTitle className='text-muted-foreground'>笔记</DialogTitle>
                                 {viewingNote && (
-                                    <DialogDescription>
+                                    <DialogDescription className='mt-2'>
                                         {viewingNote.folder?.name ?? '未分类'} ·{' '}
                                         {formatTimestamp(viewingNote.createdAt)}
                                     </DialogDescription>
@@ -492,6 +496,18 @@ export default function NoteSidebar({
                                 >
                                     <Delete20Regular />
                                 </Button>
+                                <DialogClose asChild>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="关闭查看笔记"
+                                        title="关闭"
+                                        disabled={mutating}
+                                    >
+                                        <Dismiss20Regular />
+                                    </Button>
+                                </DialogClose>
                             </div>
                         </div>
                     </DialogHeader>

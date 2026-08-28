@@ -90,7 +90,6 @@ describe('NoteSidebar', () => {
         expect(document.body.querySelector('.note-view-body h1')?.textContent).toBe(
             'Markdown title'
         )
-
         act(() =>
             (
                 document.body.querySelector(

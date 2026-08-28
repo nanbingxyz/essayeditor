@@ -357,7 +357,6 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    padding-right: 62px;
 }
 
 .note-view-actions {
