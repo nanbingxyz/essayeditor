@@ -70,7 +70,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
                     <Toggle
                         type="button"
                         size="sm"
-                        className={cn("text-xs rounded-full", isPrivate?'text-primary-foreground':'text-muted-foreground')}
+                        className={cn("text-xs rounded-full", isPrivate?'text-primary-foreground':'text-muted-foreground  opacity-45')}
                         variant="default"
                         pressed={isPrivate}
                         aria-label="仅自己可见"

@@ -276,6 +276,7 @@ function NoteEditorDialog({
                             使用 Markdown 编辑笔记内容
                         </DialogDescription>
                     </DialogHeader>
+                    <div className="py-2"></div>
                     <MarkdownEditor
                         key={`${mode}:${note?.id ?? 'new'}:${open}`}
                         ref={editorRef}

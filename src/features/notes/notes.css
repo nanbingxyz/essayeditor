@@ -164,11 +164,11 @@
 }
 
 .note-markdown-preview h1 {
-    font-size: 1.45em;
+    font-size: 1.35em;
 }
 
 .note-markdown-preview h2 {
-    font-size: 1.3em;
+    font-size: 1.25em;
 }
 
 .note-markdown-preview h3 {
@@ -425,7 +425,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 8px 14px 10px 18px;
+    padding: 8px 14px 20px 18px;
 }
 
 .note-folder-menu {
