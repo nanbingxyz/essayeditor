@@ -1,12 +1,8 @@
 import {
-    PanelLeftContract28Filled,
-    PanelLeftContract28Regular,
-    PanelLeftExpand28Filled,
-    PanelLeftExpand28Regular,
-    PanelRightContract28Filled,
-    PanelRightContract28Regular,
-    PanelRightExpand28Filled,
-    PanelRightExpand28Regular,
+    PanelLeftContract20Regular,
+    PanelLeftExpand20Regular,
+    PanelRightContract20Regular,
+    PanelRightExpand20Regular,
     bundleIcon,
 } from '@fluentui/react-icons'
 import {GearIcon} from '@radix-ui/react-icons'
@@ -22,22 +18,6 @@ import {
     type SidebarLayout,
 } from './use-sidebar-layout'
 
-const PanelLeftContractIcon = bundleIcon(
-    PanelLeftContract28Filled,
-    PanelLeftContract28Regular
-)
-const PanelLeftExpandIcon = bundleIcon(
-    PanelLeftExpand28Filled,
-    PanelLeftExpand28Regular
-)
-const PanelRightContractIcon = bundleIcon(
-    PanelRightContract28Filled,
-    PanelRightContract28Regular
-)
-const PanelRightExpandIcon = bundleIcon(
-    PanelRightExpand28Filled,
-    PanelRightExpand28Regular
-)
 
 interface AppShellProps {
     accountError: boolean
@@ -151,7 +131,7 @@ export default function AppShell({
                         tabIndex={layout.sidebarVisible ? 0 : -1}
                         onClick={layout.toggleSidebar}
                     >
-                        <PanelLeftContractIcon aria-hidden="true" />
+                        <PanelLeftContract20Regular aria-hidden="true" />
                     </button>
                 </div>
 
@@ -225,7 +205,7 @@ export default function AppShell({
                             title="显示侧边栏"
                             onClick={layout.toggleSidebar}
                         >
-                            <PanelLeftExpandIcon aria-hidden="true" />
+                            <PanelLeftExpand20Regular aria-hidden="true" />
                         </button>
                     )}
                     {page === 'editor' && (
@@ -259,9 +239,9 @@ export default function AppShell({
                             onClick={layout.toggleRightSidebar}
                         >
                             {layout.rightSidebarVisible ? (
-                                <PanelRightContractIcon aria-hidden="true" />
+                                <PanelRightContract20Regular aria-hidden="true" />
                             ) : (
-                                <PanelRightExpandIcon aria-hidden="true" />
+                                <PanelRightExpand20Regular aria-hidden="true" />
                             )}
                         </button>
                     )}

@@ -23,8 +23,9 @@ function createStore(initialValues: Record<string, unknown> = {}) {
 }
 
 const storedDraft: DraftSnapshot = {
-    version: 1,
+    version: 2,
     content: 'stored content',
+    themeId: 3,
     updatedAt: 123,
 }
 
@@ -36,15 +37,15 @@ describe('DraftRepository', () => {
         const repository = createDraftRepository({
             createId: () => ids.shift()!,
             loadStore: async () => store,
-            legacyStorage: localStorage,
             now: () => timestamps.shift()!,
         })
 
         const first = await repository.createLocalDraft()
         const second = await repository.createLocalDraft('second')
         await repository.save(getLocalDraftDocumentKey(first.localId), {
-            version: 1,
+            version: 2,
             content: 'first edited',
+            themeId: 4,
             updatedAt: 30,
         })
 
@@ -52,6 +53,7 @@ describe('DraftRepository', () => {
             {
                 ...first,
                 content: 'first edited',
+                themeId: 4,
                 updatedAt: 30,
             },
             second,
@@ -67,7 +69,6 @@ describe('DraftRepository', () => {
         const repository = createDraftRepository({
             createId: () => ids.shift()!,
             loadStore: async () => store,
-            legacyStorage: localStorage,
             now: () => 10,
         })
         await repository.createLocalDraft('one')
@@ -86,7 +87,6 @@ describe('DraftRepository', () => {
         const repository = createDraftRepository({
             createId: () => ids.shift()!,
             loadStore: async () => store,
-            legacyStorage: localStorage,
             now: () => 10,
         })
 
@@ -102,7 +102,6 @@ describe('DraftRepository', () => {
         const {store} = createStore()
         const repository = createDraftRepository({
             loadStore: async () => store,
-            legacyStorage: localStorage,
         })
 
         await repository.save('essay:one', storedDraft)
@@ -111,79 +110,35 @@ describe('DraftRepository', () => {
         await expect(repository.load('essay:two')).resolves.toBeNull()
     })
 
-    it.each([
-        ['draft:new', {'draft:new': storedDraft}],
-        ['currentDraft', {currentDraft: storedDraft}],
-    ])('migrates the former %s value into a local draft', async (_, initial) => {
-        const {store} = createStore(initial)
+    it('rejects an unsupported local draft collection without mutating it', async () => {
+        const {store} = createStore({
+            localDrafts: {version: 1, drafts: []},
+        })
         const repository = createDraftRepository({
-            createId: () => 'migrated',
             loadStore: async () => store,
-            legacyStorage: localStorage,
         })
 
-        await expect(repository.listLocalDrafts()).resolves.toEqual([
-            {
-                localId: 'migrated',
-                content: storedDraft.content,
-                createdAt: storedDraft.updatedAt,
-                updatedAt: storedDraft.updatedAt,
-            },
-        ])
-        expect(store.delete).toHaveBeenCalledWith('draft:new')
-        expect(store.delete).toHaveBeenCalledWith('currentDraft')
-    })
-
-    it('migrates a legacy backup only after the collection is saved', async () => {
-        const {store} = createStore()
-        const legacyStorage = {
-            getItem: vi.fn(() =>
-                JSON.stringify({content: 'legacy', timestamp: 456})
-            ),
-            removeItem: vi.fn(),
-        }
-        const repository = createDraftRepository({
-            createId: () => 'legacy',
-            loadStore: async () => store,
-            legacyStorage,
-        })
-
-        await expect(repository.listLocalDrafts()).resolves.toEqual([
-            expect.objectContaining({
-                localId: 'legacy',
-                content: 'legacy',
-                updatedAt: 456,
-            }),
-        ])
-        expect(vi.mocked(store.save).mock.invocationCallOrder[0]).toBeLessThan(
-            legacyStorage.removeItem.mock.invocationCallOrder[0]
+        await expect(repository.listLocalDrafts()).rejects.toThrow(
+            'Unable to read the local draft collection'
         )
-        expect(legacyStorage.removeItem).toHaveBeenCalledWith('backup')
-    })
-
-    it('retains the legacy backup when migration persistence fails', async () => {
-        const {store} = createStore()
-        vi.mocked(store.save).mockRejectedValue(new Error('disk full'))
-        const legacyStorage = {
-            getItem: vi.fn(() =>
-                JSON.stringify({content: 'legacy', timestamp: 456})
-            ),
-            removeItem: vi.fn(),
-        }
-        const repository = createDraftRepository({
-            createId: () => 'legacy',
-            loadStore: async () => store,
-            legacyStorage,
-        })
-
-        await expect(repository.listLocalDrafts()).rejects.toThrow('disk full')
-        expect(legacyStorage.removeItem).not.toHaveBeenCalled()
+        expect(store.set).not.toHaveBeenCalled()
+        expect(store.delete).not.toHaveBeenCalled()
     })
 
     it('rejects unversioned and malformed snapshots', () => {
         expect(parseDraftSnapshot({content: 'old', updatedAt: 1})).toBeNull()
         expect(
-            parseDraftSnapshot({version: 1, content: 3, updatedAt: 1})
+            parseDraftSnapshot({version: 2, content: 3, updatedAt: 1})
+        ).toBeNull()
+    })
+
+    it('rejects old snapshots without theme metadata', () => {
+        expect(
+            parseDraftSnapshot({
+                version: 1,
+                content: 'legacy',
+                updatedAt: 1,
+            })
         ).toBeNull()
     })
 })

@@ -120,18 +120,20 @@ describe('App navigation', () => {
                 [
                     'localDrafts',
                     {
-                        version: 1,
+                        version: 2,
                         drafts: [
                             {
                                 localId: 'newer',
                                 content: 'Newer draft',
                                 createdAt: 2,
+                                themeId: null,
                                 updatedAt: 3,
                             },
                             {
                                 localId: 'older',
                                 content: 'Older draft',
                                 createdAt: 1,
+                                themeId: null,
                                 updatedAt: 1,
                             },
                         ],
@@ -190,12 +192,13 @@ describe('App navigation', () => {
                 [
                     'localDrafts',
                     {
-                        version: 1,
+                        version: 2,
                         drafts: [
                             {
                                 localId: 'temporary',
                                 content: 'Publish me',
                                 createdAt: 1,
+                                themeId: null,
                                 updatedAt: 1,
                             },
                         ],
@@ -225,7 +228,13 @@ describe('App navigation', () => {
                         JSON.stringify(
                             listRequests === 1
                                 ? []
-                                : [{id: 'real-id', content: 'Publish me'}]
+                                : [
+                                      {
+                                          id: 'real-id',
+                                          content: 'Publish me',
+                                          theme_slug: null,
+                                      },
+                                  ]
                         )
                     )
                 }
@@ -276,9 +285,194 @@ describe('App navigation', () => {
             expect.stringMatching(/\/essays$/),
             expect.objectContaining({
                 method: 'POST',
-                body: JSON.stringify({content: 'Publish me'}),
+                body: JSON.stringify({
+                    content: 'Publish me',
+                    theme_id: null,
+                }),
             })
         )
+    })
+
+    it('publishes the selected numeric theme id', async () => {
+        storeFiles.set(
+            'store.bin',
+            new Map([
+                ['accessToken', 'token'],
+                ['appearance', 'system'],
+            ])
+        )
+        storeFiles.set(
+            'drafts.bin',
+            new Map([
+                [
+                    'localDrafts',
+                    {
+                        version: 2,
+                        drafts: [
+                            {
+                                localId: 'themed',
+                                content: 'Themed essay',
+                                createdAt: 1,
+                                themeId: null,
+                                updatedAt: 1,
+                            },
+                        ],
+                    },
+                ],
+            ])
+        )
+        httpFetch.mockImplementation(
+            async (input: string | URL | Request, init?: RequestInit) => {
+                const url = String(input)
+                if (url.includes('/heatmap?')) {
+                    return new Response(
+                        JSON.stringify({
+                            user: {
+                                id: 'user',
+                                avatar: 'https://example.com/avatar.png',
+                                displayName: 'User',
+                            },
+                            heatmap: {},
+                        })
+                    )
+                }
+                if (url.endsWith('/themes')) {
+                    return new Response(
+                        JSON.stringify([
+                            {
+                                id: 12,
+                                name: '技术',
+                                slug: 'tech',
+                                brief: '技术频道',
+                            },
+                        ])
+                    )
+                }
+                if (url.includes('/essays?')) {
+                    return new Response('[]')
+                }
+                if (url.endsWith('/essays') && init?.method === 'POST') {
+                    return new Response(JSON.stringify({id: 'published'}))
+                }
+                throw new Error(`Unexpected request: ${url}`)
+            }
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(<App />)
+            await settle(12)
+        })
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="选择频道"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        act(() =>
+            (
+                Array.from(container.querySelectorAll('button')).find(
+                    (button) => button.textContent === '技术'
+                ) as HTMLButtonElement
+            ).click()
+        )
+
+        await act(async () => {
+            (
+                container.querySelector(
+                    'button[aria-label="发布文章"]'
+                ) as HTMLButtonElement
+            ).click()
+            await settle(12)
+        })
+
+        expect(httpFetch).toHaveBeenCalledWith(
+            expect.stringMatching(/\/essays$/),
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    content: 'Themed essay',
+                    theme_id: 12,
+                }),
+            })
+        )
+    })
+
+    it('echoes a published theme by matching theme_slug to the theme list', async () => {
+        storeFiles.set(
+            'store.bin',
+            new Map([
+                ['accessToken', 'token'],
+                ['appearance', 'system'],
+            ])
+        )
+        httpFetch.mockImplementation(
+            async (input: string | URL | Request) => {
+                const url = String(input)
+                if (url.includes('/heatmap?')) {
+                    return new Response(
+                        JSON.stringify({
+                            user: {
+                                id: 'user',
+                                avatar: 'https://example.com/avatar.png',
+                                displayName: 'User',
+                            },
+                            heatmap: {},
+                        })
+                    )
+                }
+                if (url.endsWith('/themes')) {
+                    return new Response(
+                        JSON.stringify([
+                            {
+                                id: 12,
+                                name: '技术',
+                                slug: 'technology',
+                                brief: '技术频道',
+                            },
+                        ])
+                    )
+                }
+                if (url.includes('/essays?')) {
+                    return new Response(
+                        JSON.stringify([
+                            {
+                                id: 'themed-essay',
+                                content: 'Published with theme',
+                                theme_slug: 'technology',
+                            },
+                        ])
+                    )
+                }
+                throw new Error(`Unexpected request: ${url}`)
+            }
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(<App />)
+            await settle(12)
+        })
+        await act(async () => {
+            const essayButton = container.querySelector(
+                '[data-document-id="essay:themed-essay"]'
+            ) as HTMLButtonElement
+            essayButton.click()
+            await settle()
+        })
+
+        expect(
+            container.querySelector('button[aria-label="频道：技术"]')
+        ).not.toBeNull()
     })
 
     it('requires confirmation before deleting a local draft and selects the first remaining draft', async () => {
@@ -288,18 +482,20 @@ describe('App navigation', () => {
                 [
                     'localDrafts',
                     {
-                        version: 1,
+                        version: 2,
                         drafts: [
                             {
                                 localId: 'newer',
                                 content: 'Delete me',
                                 createdAt: 2,
+                                themeId: null,
                                 updatedAt: 3,
                             },
                             {
                                 localId: 'older',
                                 content: 'Keep me',
                                 createdAt: 1,
+                                themeId: null,
                                 updatedAt: 1,
                             },
                         ],
@@ -357,12 +553,13 @@ describe('App navigation', () => {
                 [
                     'localDrafts',
                     {
-                        version: 1,
+                        version: 2,
                         drafts: [
                             {
                                 localId: 'only',
                                 content: 'Last draft',
                                 createdAt: 1,
+                                themeId: null,
                                 updatedAt: 1,
                             },
                         ],
@@ -419,12 +616,13 @@ describe('App navigation', () => {
                 [
                     'localDrafts',
                     {
-                        version: 1,
+                        version: 2,
                         drafts: [
                             {
                                 localId: 'local',
                                 content: 'Local first',
                                 createdAt: 1,
+                                themeId: null,
                                 updatedAt: 1,
                             },
                         ],
@@ -433,8 +631,9 @@ describe('App navigation', () => {
                 [
                     'draft:essay:one',
                     {
-                        version: 1,
+                        version: 2,
                         content: 'Locally modified',
+                        themeId: null,
                         updatedAt: 2,
                     },
                 ],
@@ -460,10 +659,24 @@ describe('App navigation', () => {
                     return new Response(
                         JSON.stringify(
                             deleted
-                                ? [{id: 'two', content: 'Published two'}]
+                                ? [
+                                      {
+                                          id: 'two',
+                                          content: 'Published two',
+                                          theme_slug: null,
+                                      },
+                                  ]
                                 : [
-                                      {id: 'one', content: 'Published one'},
-                                      {id: 'two', content: 'Published two'},
+                                      {
+                                          id: 'one',
+                                          content: 'Published one',
+                                          theme_slug: null,
+                                      },
+                                      {
+                                          id: 'two',
+                                          content: 'Published two',
+                                          theme_slug: null,
+                                      },
                                   ]
                         )
                     )
@@ -553,7 +766,11 @@ describe('App navigation', () => {
                 if (url.includes('/essays?')) {
                     return new Response(
                         JSON.stringify([
-                            {id: 'one', content: 'Published one'},
+                            {
+                                id: 'one',
+                                content: 'Published one',
+                                theme_slug: null,
+                            },
                         ])
                     )
                 }

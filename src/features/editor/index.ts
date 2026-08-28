@@ -1,7 +1,6 @@
 export {
     createDraftRepository,
     getLocalDraftDocumentKey,
-    NEW_DRAFT_KEY,
 } from './draft-repository'
 export type {
     DraftRepository,

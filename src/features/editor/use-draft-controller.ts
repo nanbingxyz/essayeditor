@@ -8,6 +8,7 @@ const DRAFT_SAVE_DELAY = 1000
 
 interface DraftControllerOptions {
     baselineContent: string
+    baselineThemeId?: number | null
     documentKey: string
     onError: () => void
     persistBaseline?: boolean
@@ -16,12 +17,15 @@ interface DraftControllerOptions {
 
 interface PendingSave {
     baselineContent: string
+    baselineThemeId: number | null
     content: string
     documentKey: string
+    themeId: number | null
 }
 
 export function useDraftController({
     baselineContent,
+    baselineThemeId = null,
     documentKey,
     onError,
     persistBaseline = false,
@@ -29,36 +33,57 @@ export function useDraftController({
 }: DraftControllerOptions) {
     const [content, setContent] = useState('')
     const [initialContent, setInitialContent] = useState('')
+    const [themeId, setThemeId] = useState<number | null>(null)
     const [loadedIdentity, setLoadedIdentity] = useState('')
     const [updatedAt, setUpdatedAt] = useState(0)
     const [ready, setReady] = useState(false)
 
     const onErrorRef = useRef(onError)
     const baselineContentRef = useRef(baselineContent)
+    const baselineThemeIdRef = useRef(baselineThemeId)
     const documentKeyRef = useRef(documentKey)
     const latestContentRef = useRef('')
+    const latestThemeIdRef = useRef<number | null>(null)
     const persistedContentRef = useRef('')
+    const persistedThemeIdRef = useRef<number | null>(null)
     const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true))
     const needsSaveRef = useRef(false)
     const pendingSaveRef = useRef<PendingSave | null>(null)
 
     onErrorRef.current = onError
-    const documentIdentity = `${documentKey}\u0000${baselineContent}`
+    const documentIdentity = `${documentKey}\u0000${baselineContent}\u0000${baselineThemeId ?? ''}`
 
     const enqueueSave = useCallback(
-        ({baselineContent, content, documentKey}: PendingSave) => {
-            const pending = {baselineContent, content, documentKey}
+        ({
+            baselineContent,
+            baselineThemeId,
+            content,
+            documentKey,
+            themeId,
+        }: PendingSave) => {
+            const pending = {
+                baselineContent,
+                baselineThemeId,
+                content,
+                documentKey,
+                themeId,
+            }
             pendingSaveRef.current = pending
             const timestamp = Date.now()
             const snapshot: DraftSnapshot = {
-                version: 1,
+                version: 2,
                 content,
+                themeId,
                 updatedAt: timestamp,
             }
 
             const task = saveQueueRef.current.then(async () => {
                 try {
-                    if (content === baselineContent && !persistBaseline) {
+                    if (
+                        content === baselineContent &&
+                        themeId === baselineThemeId &&
+                        !persistBaseline
+                    ) {
                         await repository.clear(documentKey)
                     } else {
                         await repository.save(documentKey, snapshot)
@@ -66,12 +91,16 @@ export function useDraftController({
 
                     if (
                         documentKey === documentKeyRef.current &&
-                        content === latestContentRef.current
+                        content === latestContentRef.current &&
+                        themeId === latestThemeIdRef.current
                     ) {
                         persistedContentRef.current = content
+                        persistedThemeIdRef.current = themeId
                         needsSaveRef.current = false
                         setUpdatedAt(
-                            content === baselineContent && !persistBaseline
+                            content === baselineContent &&
+                                themeId === baselineThemeId &&
+                                !persistBaseline
                                 ? 0
                                 : timestamp
                         )
@@ -114,8 +143,26 @@ export function useDraftController({
             setContent(content)
             scheduleSave({
                 baselineContent: baselineContentRef.current,
+                baselineThemeId: baselineThemeIdRef.current,
                 content,
                 documentKey: documentKeyRef.current,
+                themeId: latestThemeIdRef.current,
+            })
+        },
+        [scheduleSave]
+    )
+
+    const onThemeChange = useCallback(
+        (nextThemeId: number | null) => {
+            latestThemeIdRef.current = nextThemeId
+            needsSaveRef.current = true
+            setThemeId(nextThemeId)
+            scheduleSave({
+                baselineContent: baselineContentRef.current,
+                baselineThemeId: baselineThemeIdRef.current,
+                content: latestContentRef.current,
+                documentKey: documentKeyRef.current,
+                themeId: nextThemeId,
             })
         },
         [scheduleSave]
@@ -128,14 +175,18 @@ export function useDraftController({
             if (
                 pending?.documentKey === documentKeyRef.current &&
                 pending.content === latestContentRef.current &&
-                pending.baselineContent === baselineContentRef.current
+                pending.baselineContent === baselineContentRef.current &&
+                pending.themeId === latestThemeIdRef.current &&
+                pending.baselineThemeId === baselineThemeIdRef.current
             ) {
                 return saveQueueRef.current
             }
             return enqueueSave({
                 baselineContent: baselineContentRef.current,
+                baselineThemeId: baselineThemeIdRef.current,
                 content: latestContentRef.current,
                 documentKey: documentKeyRef.current,
+                themeId: latestThemeIdRef.current,
             })
         }
         return saveQueueRef.current
@@ -146,6 +197,7 @@ export function useDraftController({
         try {
             await repository.clear(documentKeyRef.current)
             persistedContentRef.current = baselineContentRef.current
+            persistedThemeIdRef.current = baselineThemeIdRef.current
             needsSaveRef.current = false
             setUpdatedAt(0)
             return true
@@ -161,8 +213,11 @@ export function useDraftController({
         let cancelled = false
         documentKeyRef.current = documentKey
         baselineContentRef.current = baselineContent
+        baselineThemeIdRef.current = baselineThemeId
         latestContentRef.current = baselineContent
+        latestThemeIdRef.current = baselineThemeId
         persistedContentRef.current = baselineContent
+        persistedThemeIdRef.current = baselineThemeId
         needsSaveRef.current = false
         pendingSaveRef.current = null
         scheduleSave.cancel()
@@ -175,17 +230,29 @@ export function useDraftController({
                     return
                 }
                 const effectiveContent = draft?.content ?? baselineContent
+                const effectiveThemeId = draft
+                    ? draft.themeId
+                    : baselineThemeId
                 latestContentRef.current = effectiveContent
+                latestThemeIdRef.current = effectiveThemeId
                 persistedContentRef.current = effectiveContent
+                persistedThemeIdRef.current = effectiveThemeId
                 setContent(effectiveContent)
                 setInitialContent(effectiveContent)
+                setThemeId(effectiveThemeId)
                 setUpdatedAt(
                     draft &&
-                        (persistBaseline || draft.content !== baselineContent)
+                        (persistBaseline ||
+                            draft.content !== baselineContent ||
+                            effectiveThemeId !== baselineThemeId)
                         ? draft.updatedAt
                         : 0
                 )
-                if (draft?.content === baselineContent && !persistBaseline) {
+                if (
+                    draft?.content === baselineContent &&
+                    effectiveThemeId === baselineThemeId &&
+                    !persistBaseline
+                ) {
                     void repository.clear(documentKey).catch(() => undefined)
                 }
             })
@@ -193,8 +260,11 @@ export function useDraftController({
                 if (!cancelled) {
                     latestContentRef.current = baselineContent
                     persistedContentRef.current = baselineContent
+                    latestThemeIdRef.current = baselineThemeId
+                    persistedThemeIdRef.current = baselineThemeId
                     setContent(baselineContent)
                     setInitialContent(baselineContent)
+                    setThemeId(baselineThemeId)
                     setUpdatedAt(0)
                     onErrorRef.current()
                 }
@@ -212,6 +282,7 @@ export function useDraftController({
         }
     }, [
         baselineContent,
+        baselineThemeId,
         documentIdentity,
         documentKey,
         persistBaseline,
@@ -225,7 +296,9 @@ export function useDraftController({
         flush,
         initialContent,
         onContentChange,
+        onThemeChange,
         ready: ready && loadedIdentity === documentIdentity,
+        themeId,
         updatedAt,
     }
 }

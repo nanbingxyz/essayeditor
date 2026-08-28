@@ -28,6 +28,7 @@ function localDraftMethods() {
             localId: 'local',
             content: '',
             createdAt: 1,
+            themeId: null,
             updatedAt: 1,
         })),
         listLocalDrafts: vi.fn(async () => []),
@@ -54,6 +55,14 @@ function essays(count: number, offset = 0): EssayListItem[] {
     return Array.from({length: count}, (_, index) => ({
         id: String(index + offset),
         content: `published ${index + offset}`,
+        themeSlug: null,
+    }))
+}
+
+function resolvedEssays(count: number, offset = 0) {
+    return essays(count, offset).map((essay) => ({
+        ...essay,
+        themeId: null,
     }))
 }
 
@@ -75,6 +84,8 @@ function renderController(
     let date: string | null = null
     let userId = options.userId ?? 'user'
     let controller: Controller | undefined
+    const resolveThemeId = (themeSlug: string | null) =>
+        themeSlug === 'theme-six' ? 6 : null
 
     function Harness() {
         controller = useEssayLibraryController({
@@ -86,6 +97,7 @@ function renderController(
             enabled: true,
             now,
             onError: vi.fn(),
+            resolveThemeId,
             userId,
         })
         return null
@@ -186,7 +198,7 @@ describe('useEssayLibraryController', () => {
 
         await act(async () => settle())
 
-        expect(getController().entries).toEqual(essays(2))
+        expect(getController().entries).toEqual(resolvedEssays(2))
         expect(getController().loading).toBe(false)
         expect(list).not.toHaveBeenCalled()
     })
@@ -231,7 +243,7 @@ describe('useEssayLibraryController', () => {
             resolveRefresh?.(essays(2, 100))
             await settle()
         })
-        expect(getController().entries).toEqual(essays(2, 100))
+        expect(getController().entries).toEqual(resolvedEssays(2, 100))
         expect(getController().refreshing).toBe(false)
         expect(cacheRepository.save).toHaveBeenCalledWith(
             {accessToken: 'token', queryKey: 'all'},
@@ -313,7 +325,7 @@ describe('useEssayLibraryController', () => {
             })
             await settle()
         })
-        expect(getController().entries).toEqual(essays(2, 50))
+        expect(getController().entries).toEqual(resolvedEssays(2, 50))
         expect(getController().loading).toBe(false)
         expect(getController().refreshing).toBe(true)
         expect(client.list).toHaveBeenCalledWith(
@@ -336,8 +348,9 @@ describe('useEssayLibraryController', () => {
             load: vi.fn(async (key) =>
                 key === 'essay:1'
                     ? {
-                          version: 1 as const,
+                          version: 2 as const,
                           content: 'local one',
+                          themeId: 6,
                           updatedAt: 1,
                       }
                     : null
@@ -363,6 +376,35 @@ describe('useEssayLibraryController', () => {
             expect.objectContaining({date: '2026-08-27', page: 1})
         )
         expect(getController().entries).toHaveLength(20)
+    })
+
+    it('resolves the response theme slug through the theme list', async () => {
+        const client: EssayLibraryClient = {
+            list: vi.fn(async () => [
+                {
+                    id: 'themed-essay',
+                    content: 'themed',
+                    themeSlug: 'theme-six',
+                },
+            ]),
+            remove: vi.fn(async () => undefined),
+            update: vi.fn(async () => undefined),
+        }
+        const {getController} = renderController(
+            client,
+            repositoryWithoutDrafts()
+        )
+
+        await act(async () => settle())
+
+        expect(getController().entries).toEqual([
+            {
+                id: 'themed-essay',
+                content: 'themed',
+                themeId: 6,
+                themeSlug: 'theme-six',
+            },
+        ])
     })
 
     it('keeps existing entries visible while refreshing the first page', async () => {
@@ -406,7 +448,12 @@ describe('useEssayLibraryController', () => {
         })
         expect(getController().refreshing).toBe(false)
         expect(getController().entries).toEqual([
-            {id: '10', content: 'published 10'},
+            {
+                id: '10',
+                content: 'published 10',
+                themeId: null,
+                themeSlug: null,
+            },
         ])
     })
 
@@ -463,13 +510,23 @@ describe('useEssayLibraryController', () => {
         })
 
         act(() => {
-            getController().commitPublish('1', 'newly published')
-            getController().commitPublish('1', 'newly published')
+            getController().commitPublish('1', 'newly published', 3, 'tech')
+            getController().commitPublish('1', 'newly published', 3, 'tech')
         })
 
         expect(getController().entries).toEqual([
-            {id: '1', content: 'newly published'},
-            {id: '0', content: 'published 0'},
+            {
+                id: '1',
+                content: 'newly published',
+                themeId: 3,
+                themeSlug: 'tech',
+            },
+            {
+                id: '0',
+                content: 'published 0',
+                themeId: null,
+                themeSlug: null,
+            },
         ])
     })
 
@@ -494,8 +551,18 @@ describe('useEssayLibraryController', () => {
         act(() => getController().commitRemove('1'))
 
         expect(getController().entries).toEqual([
-            {id: '0', content: 'published 0'},
-            {id: '2', content: 'published 2'},
+            {
+                id: '0',
+                content: 'published 0',
+                themeId: null,
+                themeSlug: null,
+            },
+            {
+                id: '2',
+                content: 'published 2',
+                themeId: null,
+                themeSlug: null,
+            },
         ])
     })
 })

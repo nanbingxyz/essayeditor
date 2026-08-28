@@ -16,10 +16,18 @@ export function usePublishingController({
     const [loading, setLoading] = useState(false)
 
     const publish = useCallback(
-        async (content: string, accessToken: string) => {
+        async (
+            content: string,
+            themeId: number | null,
+            accessToken: string
+        ) => {
             setLoading(true)
             try {
-                const {id} = await client.publish(content, accessToken)
+                const {id} = await client.publish(
+                    content,
+                    themeId,
+                    accessToken
+                )
                 await onSuccess(id)
                 return true
             } catch (error) {

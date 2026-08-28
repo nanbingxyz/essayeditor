@@ -1,13 +1,17 @@
 interface PublishedDocumentStatusOptions {
     baselineContent: string
+    baselineThemeId: number | null
     currentContent: string
+    currentThemeId: number | null
     draftReady: boolean
     hasKnownLocalChanges: boolean
 }
 
 export function getPublishedDocumentStatus({
     baselineContent,
+    baselineThemeId,
     currentContent,
+    currentThemeId,
     draftReady,
     hasKnownLocalChanges,
 }: PublishedDocumentStatusOptions) {
@@ -15,5 +19,8 @@ export function getPublishedDocumentStatus({
         return hasKnownLocalChanges ? 'modified' : 'published'
     }
 
-    return currentContent === baselineContent ? 'published' : 'modified'
+    return currentContent === baselineContent &&
+        currentThemeId === baselineThemeId
+        ? 'published'
+        : 'modified'
 }

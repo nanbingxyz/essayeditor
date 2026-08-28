@@ -39,7 +39,8 @@ export interface EssayLibraryCacheRepository {
     updateEssay: (
         accessToken: string,
         essayId: string,
-        content: string
+        content: string,
+        themeSlug: string | null
     ) => Promise<void>
 }
 
@@ -49,7 +50,7 @@ interface StoredQuerySnapshot extends EssayLibraryCacheSnapshot {
 }
 
 interface StoredCacheCollection {
-    version: 1
+    version: 3
     snapshots: StoredQuerySnapshot[]
 }
 
@@ -70,11 +71,20 @@ function parseEssay(value: unknown): EssayListItem | null {
     if (
         typeof candidate.id !== 'string' ||
         !candidate.id ||
-        typeof candidate.content !== 'string'
+        typeof candidate.content !== 'string' ||
+        !(
+            candidate.themeSlug === null ||
+            (typeof candidate.themeSlug === 'string' &&
+                Boolean(candidate.themeSlug))
+        )
     ) {
         return null
     }
-    return {id: candidate.id, content: candidate.content}
+    return {
+        id: candidate.id,
+        content: candidate.content,
+        themeSlug: candidate.themeSlug,
+    }
 }
 
 function parseSnapshot(value: unknown): StoredQuerySnapshot | null {
@@ -124,7 +134,7 @@ function parseCollection(value: unknown): StoredCacheCollection | null {
         return null
     }
     const candidate = value as Partial<StoredCacheCollection>
-    if (candidate.version !== 1 || !Array.isArray(candidate.snapshots)) {
+    if (candidate.version !== 3 || !Array.isArray(candidate.snapshots)) {
         return null
     }
 
@@ -141,7 +151,7 @@ function parseCollection(value: unknown): StoredCacheCollection | null {
         keys.add(key)
         snapshots.push(snapshot)
     }
-    return {version: 1, snapshots}
+    return {version: 3, snapshots}
 }
 
 async function createTokenFingerprint(accessToken: string) {
@@ -180,7 +190,7 @@ export function createEssayLibraryCacheRepository({
         const store = await getStore()
         return (
             parseCollection(await store.get<unknown>(CACHE_COLLECTION_KEY)) ?? {
-                version: 1 as const,
+                version: 3 as const,
                 snapshots: [],
             }
         )
@@ -209,7 +219,7 @@ export function createEssayLibraryCacheRepository({
         await enqueueMutation(async () => {
             const collection = await readCollection()
             await writeCollection({
-                version: 1,
+                version: 3,
                 snapshots: collection.snapshots.map((snapshot) =>
                     snapshot.account === account ? mutate(snapshot) : snapshot
                 ),
@@ -264,7 +274,7 @@ export function createEssayLibraryCacheRepository({
                     page: snapshot.page,
                 }
                 await writeCollection({
-                    version: 1,
+                    version: 3,
                     snapshots: [
                         ...collection.snapshots.filter(
                             (candidate) =>
@@ -275,11 +285,13 @@ export function createEssayLibraryCacheRepository({
                     ],
                 })
             }),
-        updateEssay: (accessToken, essayId, content) =>
+        updateEssay: (accessToken, essayId, content, themeSlug) =>
             mutateAccount(accessToken, (snapshot) => ({
                 ...snapshot,
                 entries: snapshot.entries.map((entry) =>
-                    entry.id === essayId ? {id: essayId, content} : entry
+                    entry.id === essayId
+                        ? {id: essayId, content, themeSlug}
+                        : entry
                 ),
             })),
     }

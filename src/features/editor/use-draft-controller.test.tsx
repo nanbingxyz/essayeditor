@@ -15,6 +15,7 @@ function localDraftMethods() {
             localId: 'local',
             content: '',
             createdAt: 1,
+            themeId: null,
             updatedAt: 1,
         })),
         listLocalDrafts: vi.fn(async () => []),
@@ -72,8 +73,9 @@ describe('useDraftController', () => {
             clear: vi.fn(async () => undefined),
             load: vi.fn(
                 async (): Promise<DraftSnapshot> => ({
-                    version: 1,
+                    version: 2,
                     content: 'restored',
+                    themeId: 7,
                     updatedAt: 100,
                 })
             ),
@@ -85,6 +87,7 @@ describe('useDraftController', () => {
         await act(async () => Promise.resolve())
         expect(getController().ready).toBe(true)
         expect(getController().initialContent).toBe('restored')
+        expect(getController().themeId).toBe(7)
 
         act(() => {
             getController().onContentChange('first')
@@ -131,8 +134,9 @@ describe('useDraftController', () => {
             ...localDraftMethods(),
             clear: vi.fn(async () => undefined),
             load: vi.fn(async () => ({
-                version: 1 as const,
+                version: 2 as const,
                 content: 'local edit',
+                themeId: null,
                 updatedAt: 100,
             })),
             save: vi.fn(async () => undefined),
@@ -192,4 +196,30 @@ describe('useDraftController', () => {
         )
         expect(repository.clear).not.toHaveBeenCalled()
     })
+
+    it('persists and restores a theme-only published override', async () => {
+        const repository: DraftRepository = {
+            ...localDraftMethods(),
+            clear: vi.fn(async () => undefined),
+            load: vi.fn(async () => null),
+            save: vi.fn(async () => undefined),
+        }
+        const getController = renderController(repository, {
+            baselineContent: 'published',
+            documentKey: 'essay:one',
+        })
+        await act(async () => Promise.resolve())
+
+        act(() => {
+            getController().onThemeChange(9)
+            vi.advanceTimersByTime(1000)
+        })
+        await act(async () => getController().flush())
+
+        expect(repository.save).toHaveBeenCalledWith(
+            'essay:one',
+            expect.objectContaining({content: 'published', themeId: 9})
+        )
+    })
+
 })

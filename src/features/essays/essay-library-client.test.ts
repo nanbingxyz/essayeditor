@@ -12,7 +12,11 @@ function response(body = '', status = 200) {
 describe('EssayLibraryClient', () => {
     it('loads a dated page for the current user', async () => {
         const httpClient = vi.fn(async () =>
-            response(JSON.stringify([{id: 7, content: '# Hello'}]))
+            response(
+                JSON.stringify([
+                    {id: '7', content: '# Hello', theme_slug: 'technology'},
+                ])
+            )
         )
         const client = createEssayLibraryClient({
             baseUrl: 'https://api.essay.ink///',
@@ -28,7 +32,9 @@ describe('EssayLibraryClient', () => {
                 signal,
                 userId: 'user id',
             })
-        ).resolves.toEqual([{id: '7', content: '# Hello'}])
+        ).resolves.toEqual([
+            {id: '7', content: '# Hello', themeSlug: 'technology'},
+        ])
         expect(httpClient).toHaveBeenCalledWith(
             'https://api.essay.ink/essays?page=2&uid=user+id&date=2026-08-27',
             {
@@ -37,6 +43,44 @@ describe('EssayLibraryClient', () => {
                 signal,
             }
         )
+    })
+
+    it('treats an omitted theme_slug as no selected theme', async () => {
+        const client = createEssayLibraryClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () =>
+                response('[{"id":"legacy","content":"Old essay"}]'),
+        })
+
+        await expect(
+            client.list({
+                accessToken: 'token',
+                page: 1,
+                userId: 'user',
+            })
+        ).resolves.toEqual([
+            {id: 'legacy', content: 'Old essay', themeSlug: null},
+        ])
+    })
+
+    it('accepts a camelCase themeSlug from the essay response', async () => {
+        const client = createEssayLibraryClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () =>
+                response(
+                    '[{"id":"essay","content":"Themed","themeSlug":"technology"}]'
+                ),
+        })
+
+        await expect(
+            client.list({
+                accessToken: 'token',
+                page: 1,
+                userId: 'user',
+            })
+        ).resolves.toEqual([
+            {id: 'essay', content: 'Themed', themeSlug: 'technology'},
+        ])
     })
 
     it('updates only the content of an encoded essay id', async () => {
@@ -48,12 +92,12 @@ describe('EssayLibraryClient', () => {
             httpClient,
         })
 
-        await client.update('essay/id', 'updated', 'token')
+        await client.update('essay/id', 'updated', null, 'token')
         expect(httpClient).toHaveBeenCalledWith(
             'https://api.essay.ink/essays/essay%2Fid',
             expect.objectContaining({
                 method: 'PUT',
-                body: JSON.stringify({content: 'updated'}),
+                body: JSON.stringify({content: 'updated', theme_id: null}),
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer token',

@@ -24,7 +24,7 @@ function createStore(initial: Record<string, unknown> = {}) {
 function snapshot(id: string) {
     return {
         cachedAt: 200,
-        entries: [{id, content: `essay ${id}`}],
+        entries: [{id, content: `essay ${id}`, themeSlug: null}],
         firstPageFetchedAt: 100,
         hasMore: true,
         page: 2,
@@ -106,10 +106,11 @@ describe('essay library cache repository', () => {
                 snapshot('one')
             ),
         ])
-        await repository.updateEssay('token', 'one', 'updated')
+        await repository.updateEssay('token', 'one', 'updated', 'tech')
         await repository.prependToAll('token', {
             id: 'new',
             content: 'new essay',
+            themeSlug: null,
         })
         await repository.removeEssay('token', 'one')
 
@@ -117,7 +118,7 @@ describe('essay library cache repository', () => {
             repository.load({accessToken: 'token', queryKey: 'all'})
         ).resolves.toMatchObject({
             cachedAt: 200,
-            entries: [{id: 'new', content: 'new essay'}],
+            entries: [{id: 'new', content: 'new essay', themeSlug: null}],
             firstPageFetchedAt: 100,
         })
         await expect(

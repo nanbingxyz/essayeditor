@@ -39,6 +39,12 @@ import {
     SettingsPage,
     useSettingsController,
 } from '@/features/settings'
+import {
+    createThemeCacheRepository,
+    createThemeClient,
+    ThemeSelector,
+    useThemeController,
+} from '@/features/themes'
 import {tauriDesktopAdapter} from '@/shared/platform/desktop'
 import {ToastAction, useToast} from '@/shared/ui'
 
@@ -47,11 +53,19 @@ import {getPublishedDocumentStatus} from './document-status'
 
 type ActiveDocument =
     | ({kind: 'draft'} & LocalDraft)
-    | {kind: 'published'; content: string; id: string}
+    | {
+          kind: 'published'
+          content: string
+          id: string
+          themeId: number | null
+          themeSlug: string | null
+      }
 
 interface PendingPublish {
     content: string
     localId: string
+    themeId: number | null
+    themeSlug: string | null
 }
 
 function sortDrafts(drafts: LocalDraft[]) {
@@ -73,6 +87,7 @@ function createRecoveryDraft(): LocalDraft {
         localId: `recovery-${timestamp}`,
         content: '',
         createdAt: timestamp,
+        themeId: null,
         updatedAt: timestamp,
     }
 }
@@ -109,6 +124,11 @@ export default function App() {
         createEssayLibraryCacheRepository,
         []
     )
+    const themeClient = useMemo(
+        () => createThemeClient({baseUrl: essayApiBaseUrl}),
+        []
+    )
+    const themeCacheRepository = useMemo(createThemeCacheRepository, [])
 
     localDraftsRef.current = localDrafts
 
@@ -152,6 +172,10 @@ export default function App() {
             activeDocument?.kind === 'published'
                 ? activeDocument.content
                 : '',
+        baselineThemeId:
+            activeDocument?.kind === 'published'
+                ? activeDocument.themeId
+                : null,
         documentKey: activeDocumentKey,
         persistBaseline: activeDocument?.kind === 'draft',
         repository: draftRepository,
@@ -174,6 +198,21 @@ export default function App() {
         enabled: settings.ready,
         onError: notifyActivityError,
     })
+    const themes = useThemeController({
+        accessToken: settings.accessToken,
+        cacheRepository: themeCacheRepository,
+        client: themeClient,
+        enabled: settings.ready,
+    })
+    const resolveThemeId = useCallback(
+        (themeSlug: string | null) =>
+            themeSlug === null
+                ? null
+                : (themes.themes.find(
+                      (theme) => theme.slug === themeSlug
+                  )?.id ?? null),
+        [themes.themes]
+    )
 
     const notifyEssayListError = useCallback(
         (message: string) => {
@@ -193,6 +232,7 @@ export default function App() {
         draftRepository,
         enabled: Boolean(settings.ready && settings.accessToken),
         onError: notifyEssayListError,
+        resolveThemeId,
         userId: activity.user?.id ?? '',
     })
 
@@ -227,10 +267,17 @@ export default function App() {
                           kind: 'published',
                           id,
                           content: publishedDraft.content,
+                          themeId: publishedDraft.themeId,
+                          themeSlug: publishedDraft.themeSlug,
                       }
                     : current
             )
-            library.commitPublish(id, publishedDraft.content)
+            library.commitPublish(
+                id,
+                publishedDraft.content,
+                publishedDraft.themeId,
+                publishedDraft.themeSlug
+            )
 
             try {
                 await draftRepository.removeLocalDraft(
@@ -313,6 +360,16 @@ export default function App() {
     }, [draftRepository, notifyDraftError])
 
     useEffect(() => {
+        if (activeDocument?.kind !== 'published') {
+            return
+        }
+        const resolvedThemeId = resolveThemeId(activeDocument.themeSlug)
+        if (resolvedThemeId !== activeDocument.themeId) {
+            setActiveDocument({...activeDocument, themeId: resolvedThemeId})
+        }
+    }, [activeDocument, resolveThemeId])
+
+    useEffect(() => {
         if (
             activeDocument?.kind !== 'draft' ||
             !draft.ready ||
@@ -328,6 +385,7 @@ export default function App() {
                         ? {
                               ...entry,
                               content: draft.content,
+                              themeId: draft.themeId,
                               updatedAt: draft.updatedAt || entry.updatedAt,
                           }
                         : entry
@@ -341,6 +399,7 @@ export default function App() {
             : null,
         draft.content,
         draft.ready,
+        draft.themeId,
         draft.updatedAt,
         localDraftsReady,
     ])
@@ -391,13 +450,20 @@ export default function App() {
         }
 
         const content = editorRef.current?.getValue() ?? draft.content
+        const selectedTheme = themes.themes.find(
+            (theme) => theme.id === draft.themeId
+        )
+        const themeSlug = selectedTheme?.slug ?? null
         if (activeDocument.kind === 'draft') {
             pendingPublishRef.current = {
                 localId: activeDocument.localId,
                 content,
+                themeId: draft.themeId,
+                themeSlug,
             }
             const published = await publishing.publish(
                 content,
+                draft.themeId,
                 settings.accessToken
             )
             if (!published) {
@@ -405,7 +471,10 @@ export default function App() {
             }
             return
         }
-        if (content === activeDocument.content) {
+        if (
+            content === activeDocument.content &&
+            draft.themeId === activeDocument.themeId
+        ) {
             return
         }
 
@@ -414,14 +483,22 @@ export default function App() {
             await essayLibraryClient.update(
                 activeDocument.id,
                 content,
+                draft.themeId,
                 settings.accessToken
             )
             await draft.clear()
-            library.commitUpdate(activeDocument.id, content)
+            library.commitUpdate(
+                activeDocument.id,
+                content,
+                draft.themeId,
+                themeSlug
+            )
             setActiveDocument({
                 kind: 'published',
                 id: activeDocument.id,
                 content,
+                themeId: draft.themeId,
+                themeSlug,
             })
             toast({title: '文章已更新'})
         } catch (error) {
@@ -462,6 +539,8 @@ export default function App() {
                 kind: 'published',
                 id: firstEssay.id,
                 content: firstEssay.content,
+                themeId: firstEssay.themeId,
+                themeSlug: firstEssay.themeSlug,
             })
             return
         }
@@ -555,7 +634,7 @@ export default function App() {
         }
 
         const emptyDraft = localDraftsRef.current.find(
-            (entry) => !entry.content.trim()
+            (entry) => !entry.content.trim() && entry.themeId === null
         )
         if (emptyDraft) {
             setActiveDocument(activateDraft(emptyDraft))
@@ -605,6 +684,8 @@ export default function App() {
             kind: 'published',
             id: essay.id,
             content: essay.content,
+            themeId: essay.themeId,
+            themeSlug: essay.themeSlug,
         })
         showEditor()
     }
@@ -635,9 +716,41 @@ export default function App() {
             )
             return
         }
-        library.setLocalContent(
+        library.setLocalDraft(
             activeDocument.id,
-            content === activeDocument.content ? null : content
+            content,
+            draft.themeId,
+            content !== activeDocument.content ||
+                draft.themeId !== activeDocument.themeId
+        )
+    }
+
+    const handleThemeChange = (themeId: number | null) => {
+        if (!activeDocument) {
+            return
+        }
+        draft.onThemeChange(themeId)
+        if (activeDocument.kind === 'draft') {
+            const updatedAt = Date.now()
+            setActiveDocument({...activeDocument, themeId, updatedAt})
+            setLocalDrafts((current) =>
+                sortDrafts(
+                    current.map((entry) =>
+                        entry.localId === activeDocument.localId
+                            ? {...entry, themeId, updatedAt}
+                            : entry
+                    )
+                )
+            )
+            return
+        }
+        const content = editorRef.current?.getValue() ?? draft.content
+        library.setLocalDraft(
+            activeDocument.id,
+            content,
+            themeId,
+            content !== activeDocument.content ||
+                themeId !== activeDocument.themeId
         )
     }
 
@@ -652,6 +765,8 @@ export default function App() {
             ? getPublishedDocumentStatus({
                   baselineContent: activeDocument.content,
                   currentContent: draft.content,
+                  baselineThemeId: activeDocument.themeId,
+                  currentThemeId: draft.themeId,
                   draftReady: draft.ready,
                   hasKnownLocalChanges:
                       activeEssayEntry?.localContent !== undefined,
@@ -683,20 +798,45 @@ export default function App() {
             articleCounts={activity.heatmap}
             editorStatusLabel={editorStatusLabel}
             editorToolbarActions={
-                <DeleteDocumentButton
-                    deleting={deleting}
-                    disabled={Boolean(
-                        !activeDocument ||
-                            !draft.ready ||
-                            !localDraftsReady ||
-                            publishing.loading ||
-                            updating ||
-                            (activeDocument.kind === 'published' &&
-                                !settings.accessToken)
-                    )}
-                    onDelete={deleteDocument}
-                    published={activeDocument?.kind === 'published'}
-                />
+                <>
+                    <ThemeSelector
+                        disabled={Boolean(
+                            !activeDocument ||
+                                !draft.ready ||
+                                !localDraftsReady ||
+                                !settings.accessToken ||
+                                publishing.loading ||
+                                updating ||
+                                deleting
+                        )}
+                        loading={themes.loading}
+                        onChange={handleThemeChange}
+                        onOpen={() => void themes.refreshIfExpired()}
+                        ready={themes.ready}
+                        themes={themes.themes}
+                        unknownSelection={Boolean(
+                            activeDocument?.kind === 'published' &&
+                                activeDocument.themeSlug &&
+                                draft.themeId === null &&
+                                draft.updatedAt === 0
+                        )}
+                        value={draft.themeId}
+                    />
+                    <DeleteDocumentButton
+                        deleting={deleting}
+                        disabled={Boolean(
+                            !activeDocument ||
+                                !draft.ready ||
+                                !localDraftsReady ||
+                                publishing.loading ||
+                                updating ||
+                                (activeDocument.kind === 'published' &&
+                                    !settings.accessToken)
+                        )}
+                        onDelete={deleteDocument}
+                        published={activeDocument?.kind === 'published'}
+                    />
+                </>
             }
             hasAccessToken={Boolean(settings.accessToken)}
             layout={layout}

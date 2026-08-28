@@ -41,16 +41,25 @@ describe('SidebarEssayList', () => {
                             localId: 'newer',
                             content: 'Newest draft',
                             createdAt: 2,
+                            themeId: null,
                             updatedAt: 3,
                         },
                         {
                             localId: 'older',
                             content: 'Older draft',
                             createdAt: 1,
+                            themeId: null,
                             updatedAt: 1,
                         },
                     ]}
-                    entries={[{id: 'published', content: 'Published essay'}]}
+                    entries={[
+                        {
+                            id: 'published',
+                            content: 'Published essay',
+                            themeId: null,
+                            themeSlug: null,
+                        },
+                    ]}
                     error={null}
                     hasMore={false}
                     loading={false}
@@ -115,6 +124,7 @@ describe('SidebarEssayList', () => {
                     localId: 'draft-one',
                     content: '',
                     createdAt: 1,
+                    themeId: null,
                     updatedAt: 1,
                 },
             ],
@@ -147,6 +157,8 @@ describe('SidebarEssayList', () => {
                         {
                             id: 'one',
                             content: '# Published',
+                            themeId: null,
+                            themeSlug: null,
                             localContent: '**Local** edit',
                         },
                     ]}
@@ -178,6 +190,7 @@ describe('SidebarEssayList', () => {
                             localId: 'draft-one',
                             content: '',
                             createdAt: 1,
+                            themeId: null,
                             updatedAt: 1,
                         },
                     ]}
@@ -243,10 +256,18 @@ describe('SidebarEssayList', () => {
                             localId: 'draft-one',
                             content: '',
                             createdAt: 1,
+                            themeId: null,
                             updatedAt: 1,
                         },
                     ]}
-                    entries={[{id: 'one', content: 'Published'}]}
+                    entries={[
+                        {
+                            id: 'one',
+                            content: 'Published',
+                            themeId: null,
+                            themeSlug: null,
+                        },
+                    ]}
                     error={null}
                     hasMore={false}
                     loading={false}
@@ -295,6 +316,8 @@ describe('SidebarEssayList', () => {
         expect(onSelectEssay).toHaveBeenCalledWith({
             id: 'one',
             content: 'Published',
+            themeId: null,
+            themeSlug: null,
         })
 
         act(() => root.unmount())
@@ -314,10 +337,18 @@ describe('SidebarEssayList', () => {
                             localId: 'draft-one',
                             content: '',
                             createdAt: 1,
+                            themeId: null,
                             updatedAt: 1,
                         },
                     ]}
-                    entries={[{id: 'one', content: 'Published'}]}
+                    entries={[
+                        {
+                            id: 'one',
+                            content: 'Published',
+                            themeId: null,
+                            themeSlug: null,
+                        },
+                    ]}
                     error={null}
                     hasMore
                     loading={false}
@@ -362,7 +393,14 @@ describe('SidebarEssayList', () => {
         const props = {
             activeDocumentId: null,
             drafts: [],
-            entries: [{id: 'one', content: 'Published'}],
+            entries: [
+                {
+                    id: 'one',
+                    content: 'Published',
+                    themeId: null,
+                    themeSlug: null,
+                },
+            ],
             error: null,
             hasMore: true,
             loading: false,

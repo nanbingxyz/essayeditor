@@ -7,7 +7,9 @@ describe('getPublishedDocumentStatus', () => {
         expect(
             getPublishedDocumentStatus({
                 baselineContent: 'next published article',
+                baselineThemeId: null,
                 currentContent: 'previous local edit',
+                currentThemeId: null,
                 draftReady: false,
                 hasKnownLocalChanges: false,
             })
@@ -16,7 +18,9 @@ describe('getPublishedDocumentStatus', () => {
         expect(
             getPublishedDocumentStatus({
                 baselineContent: 'next published article',
+                baselineThemeId: null,
                 currentContent: 'previous published article',
+                currentThemeId: null,
                 draftReady: false,
                 hasKnownLocalChanges: true,
             })
@@ -27,7 +31,9 @@ describe('getPublishedDocumentStatus', () => {
         expect(
             getPublishedDocumentStatus({
                 baselineContent: 'published article',
+                baselineThemeId: null,
                 currentContent: 'published article',
+                currentThemeId: null,
                 draftReady: true,
                 hasKnownLocalChanges: true,
             })
@@ -36,7 +42,22 @@ describe('getPublishedDocumentStatus', () => {
         expect(
             getPublishedDocumentStatus({
                 baselineContent: 'published article',
+                baselineThemeId: null,
                 currentContent: 'local edit',
+                currentThemeId: null,
+                draftReady: true,
+                hasKnownLocalChanges: false,
+            })
+        ).toBe('modified')
+    })
+
+    it('treats a theme-only change as modified', () => {
+        expect(
+            getPublishedDocumentStatus({
+                baselineContent: 'published article',
+                baselineThemeId: 1,
+                currentContent: 'published article',
+                currentThemeId: 2,
                 draftReady: true,
                 hasKnownLocalChanges: false,
             })

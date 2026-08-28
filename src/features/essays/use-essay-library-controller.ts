@@ -22,6 +22,8 @@ export const ALL_ESSAYS_REFRESH_INTERVAL = 10 * MINUTE
 
 export interface EssayListEntry extends EssayListItem {
     localContent?: string
+    localThemeId?: number | null
+    themeId: number | null
 }
 
 interface EssayLibraryControllerOptions {
@@ -33,6 +35,7 @@ interface EssayLibraryControllerOptions {
     enabled: boolean
     now?: () => number
     onError: (message: string) => void
+    resolveThemeId: (themeSlug: string | null) => number | null
     userId: string
 }
 
@@ -57,7 +60,11 @@ function isCacheValid(
 }
 
 function remoteEntries(entries: EssayListEntry[]): EssayListItem[] {
-    return entries.map(({id, content}) => ({id, content}))
+    return entries.map(({id, content, themeSlug}) => ({
+        id,
+        content,
+        themeSlug,
+    }))
 }
 
 export function useEssayLibraryController({
@@ -69,6 +76,7 @@ export function useEssayLibraryController({
     enabled,
     now = Date.now,
     onError,
+    resolveThemeId,
     userId,
 }: EssayLibraryControllerOptions) {
     const [entries, setEntries] = useState<EssayListEntry[]>([])
@@ -137,16 +145,30 @@ export function useEssayLibraryController({
                 essays.map(async (essay): Promise<EssayListEntry> => {
                     const key = `essay:${essay.id}`
                     const draft = await draftRepository.load(key)
-                    if (!draft || draft.content === essay.content) {
-                        if (draft?.content === essay.content) {
+                    const themeId = resolveThemeId(essay.themeSlug)
+                    const localThemeId = draft ? draft.themeId : themeId
+                    if (
+                        !draft ||
+                        (draft.content === essay.content &&
+                            localThemeId === themeId)
+                    ) {
+                        if (
+                            draft?.content === essay.content &&
+                            localThemeId === themeId
+                        ) {
                             void draftRepository.clear(key).catch(() => undefined)
                         }
-                        return essay
+                        return {...essay, themeId}
                     }
-                    return {...essay, localContent: draft.content}
+                    return {
+                        ...essay,
+                        themeId,
+                        localContent: draft.content,
+                        localThemeId,
+                    }
                 })
             ),
-        [draftRepository]
+        [draftRepository, resolveThemeId]
     )
 
     useEffect(() => {
@@ -466,11 +488,22 @@ export function useEssayLibraryController({
         }
     }, [loadMore, moreError, refresh])
 
-    const setLocalContent = useCallback(
-        (essayId: string, localContent: string | null) => {
+    const setLocalDraft = useCallback(
+        (
+            essayId: string,
+            localContent: string,
+            localThemeId: number | null,
+            modified: boolean
+        ) => {
             const nextEntries = entriesRef.current.map((entry) =>
                 entry.id === essayId
-                    ? {...entry, localContent: localContent ?? undefined}
+                    ? {
+                          ...entry,
+                          localContent: modified ? localContent : undefined,
+                          localThemeId: modified
+                              ? localThemeId
+                              : undefined,
+                      }
                     : entry
             )
             setCurrentEntries(nextEntries)
@@ -479,15 +512,22 @@ export function useEssayLibraryController({
     )
 
     const commitUpdate = useCallback(
-        (essayId: string, content: string) => {
+        (
+            essayId: string,
+            content: string,
+            themeId: number | null,
+            themeSlug: string | null
+        ) => {
             setCurrentEntries(
                 entriesRef.current.map((entry) =>
-                    entry.id === essayId ? {id: entry.id, content} : entry
+                    entry.id === essayId
+                        ? {id: entry.id, content, themeId, themeSlug}
+                        : entry
                 )
             )
             if (accessToken) {
                 void cacheRepository
-                    .updateEssay(accessToken, essayId, content)
+                    .updateEssay(accessToken, essayId, content, themeSlug)
                     .catch(() => undefined)
             }
         },
@@ -495,10 +535,15 @@ export function useEssayLibraryController({
     )
 
     const commitPublish = useCallback(
-        (essayId: string, content: string) => {
+        (
+            essayId: string,
+            content: string,
+            themeId: number | null,
+            themeSlug: string | null
+        ) => {
             if (!date) {
                 setCurrentEntries([
-                    {id: essayId, content},
+                    {id: essayId, content, themeId, themeSlug},
                     ...entriesRef.current.filter(
                         (entry) => entry.id !== essayId
                     ),
@@ -506,7 +551,11 @@ export function useEssayLibraryController({
             }
             if (accessToken) {
                 void cacheRepository
-                    .prependToAll(accessToken, {id: essayId, content})
+                    .prependToAll(accessToken, {
+                        id: essayId,
+                        content,
+                        themeSlug,
+                    })
                     .catch(() => undefined)
             }
         },
@@ -541,6 +590,6 @@ export function useEssayLibraryController({
         refresh,
         refreshing,
         retry,
-        setLocalContent,
+        setLocalDraft,
     }
 }

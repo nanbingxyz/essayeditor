@@ -5,6 +5,7 @@ const PAGE_SIZE = 20
 export interface EssayListItem {
     id: string
     content: string
+    themeSlug: string | null
 }
 
 export interface EssayListQuery {
@@ -25,6 +26,7 @@ export interface EssayLibraryClient {
     update: (
         essayId: string,
         content: string,
+        themeId: number | null,
         accessToken: string,
         signal?: AbortSignal
     ) => Promise<void>
@@ -70,18 +72,40 @@ function readEssayList(payload: unknown): EssayListItem[] | null {
             return null
         }
 
-        const {id, content} = value as {id?: unknown; content?: unknown}
-        const normalizedId =
-            typeof id === 'string' && id.trim()
-                ? id.trim()
-                : typeof id === 'number' && Number.isFinite(id)
-                  ? String(id)
-                  : null
-        if (!normalizedId || typeof content !== 'string') {
+        const {
+            id,
+            content,
+            theme_slug: snakeCaseThemeSlug,
+            themeSlug: camelCaseThemeSlug,
+        } = value as {
+            id?: unknown
+            content?: unknown
+            theme_slug?: unknown
+            themeSlug?: unknown
+        }
+        const themeSlug =
+            snakeCaseThemeSlug === undefined
+                ? camelCaseThemeSlug
+                : snakeCaseThemeSlug
+        if (
+            typeof id !== 'string' ||
+            !id.trim() ||
+            typeof content !== 'string' ||
+            !(
+                themeSlug === undefined ||
+                themeSlug === null ||
+                (typeof themeSlug === 'string' && themeSlug.trim())
+            )
+        ) {
             return null
         }
 
-        essays.push({id: normalizedId, content})
+        essays.push({
+            id: id.trim(),
+            content,
+            themeSlug:
+                typeof themeSlug === 'string' ? themeSlug.trim() : null,
+        })
     }
     return essays
 }
@@ -158,7 +182,7 @@ export function createEssayLibraryClient({
                 )
             }
         },
-        update: async (essayId, content, accessToken, signal) => {
+        update: async (essayId, content, themeId, accessToken, signal) => {
             let response: Response
             try {
                 response = await httpClient(
@@ -169,7 +193,7 @@ export function createEssayLibraryClient({
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${accessToken}`,
                         },
-                        body: JSON.stringify({content}),
+                        body: JSON.stringify({content, theme_id: themeId}),
                         signal,
                     }
                 )

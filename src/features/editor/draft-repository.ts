@@ -4,17 +4,14 @@ import {
 } from '@/shared/platform/store'
 
 const DRAFT_STORE_PATH = 'drafts.bin'
-const CURRENT_DRAFT_KEY = 'currentDraft'
-const LEGACY_BACKUP_KEY = 'backup'
 const DRAFT_KEY_PREFIX = 'draft:'
 const LOCAL_DRAFT_KEY_PREFIX = 'local:'
 const LOCAL_DRAFT_COLLECTION_KEY = 'localDrafts'
 
-export const NEW_DRAFT_KEY = 'new'
-
 export interface DraftSnapshot {
-    version: 1
+    version: 2
     content: string
+    themeId: number | null
     updatedAt: number
 }
 
@@ -22,11 +19,12 @@ export interface LocalDraft {
     localId: string
     content: string
     createdAt: number
+    themeId: number | null
     updatedAt: number
 }
 
 interface LocalDraftCollection {
-    version: 1
+    version: 2
     drafts: LocalDraft[]
 }
 
@@ -39,20 +37,24 @@ export interface DraftRepository {
     save: (documentKey: string, draft: DraftSnapshot) => Promise<void>
 }
 
-export interface LegacyStorage {
-    getItem: (key: string) => string | null
-    removeItem: (key: string) => void
-}
-
 interface DraftRepositoryOptions {
     createId?: () => string
-    legacyStorage?: LegacyStorage
     loadStore?: StoreLoader
     now?: () => number
 }
 
 function isFiniteTimestamp(value: unknown): value is number {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function parseThemeId(value: unknown) {
+    return value === null
+        ? null
+        : typeof value === 'number' &&
+            Number.isFinite(value) &&
+            Number.isInteger(value)
+          ? value
+          : undefined
 }
 
 function createDefaultId() {
@@ -74,12 +76,14 @@ function parseLocalDraft(value: unknown): LocalDraft | null {
     }
 
     const candidate = value as Partial<LocalDraft>
+    const themeId = parseThemeId(candidate.themeId)
     if (
         typeof candidate.localId !== 'string' ||
         !candidate.localId ||
         typeof candidate.content !== 'string' ||
         !isFiniteTimestamp(candidate.createdAt) ||
-        !isFiniteTimestamp(candidate.updatedAt)
+        !isFiniteTimestamp(candidate.updatedAt) ||
+        themeId === undefined
     ) {
         return null
     }
@@ -88,6 +92,7 @@ function parseLocalDraft(value: unknown): LocalDraft | null {
         localId: candidate.localId,
         content: candidate.content,
         createdAt: candidate.createdAt,
+        themeId,
         updatedAt: candidate.updatedAt,
     }
 }
@@ -98,7 +103,7 @@ function parseLocalDraftCollection(value: unknown): LocalDraftCollection | null 
     }
 
     const candidate = value as Partial<LocalDraftCollection>
-    if (candidate.version !== 1 || !Array.isArray(candidate.drafts)) {
+    if (candidate.version !== 2 || !Array.isArray(candidate.drafts)) {
         return null
     }
 
@@ -113,7 +118,7 @@ function parseLocalDraftCollection(value: unknown): LocalDraftCollection | null 
         drafts.push(draft)
     }
 
-    return {version: 1, drafts: sortLocalDrafts(drafts)}
+    return {version: 2, drafts: sortLocalDrafts(drafts)}
 }
 
 export function getLocalDraftDocumentKey(localId: string) {
@@ -133,51 +138,26 @@ export function parseDraftSnapshot(value: unknown): DraftSnapshot | null {
     }
 
     const candidate = value as Partial<DraftSnapshot>
+    const themeId = parseThemeId(candidate.themeId)
     if (
-        candidate.version !== 1 ||
+        candidate.version !== 2 ||
         typeof candidate.content !== 'string' ||
-        !isFiniteTimestamp(candidate.updatedAt)
+        !isFiniteTimestamp(candidate.updatedAt) ||
+        themeId === undefined
     ) {
         return null
     }
 
     return {
-        version: 1,
+        version: 2,
         content: candidate.content,
+        themeId,
         updatedAt: candidate.updatedAt,
-    }
-}
-
-export function parseLegacyBackup(serialized: string | null): DraftSnapshot | null {
-    if (!serialized) {
-        return null
-    }
-
-    try {
-        const candidate = JSON.parse(serialized) as {
-            content?: unknown
-            timestamp?: unknown
-        }
-        if (
-            typeof candidate.content !== 'string' ||
-            !isFiniteTimestamp(candidate.timestamp)
-        ) {
-            return null
-        }
-
-        return {
-            version: 1,
-            content: candidate.content,
-            updatedAt: candidate.timestamp,
-        }
-    } catch {
-        return null
     }
 }
 
 export function createDraftRepository({
     createId = createDefaultId,
-    legacyStorage = window.localStorage,
     loadStore = loadTauriStore,
     now = Date.now,
 }: DraftRepositoryOptions = {}): DraftRepository {
@@ -216,67 +196,16 @@ export function createDraftRepository({
                 storedCollection
             )
             if (collection) {
-                const removedNewDraft = await store.delete(
-                    getDraftStoreKey(NEW_DRAFT_KEY)
-                )
-                const removedCurrentDraft = await store.delete(
-                    CURRENT_DRAFT_KEY
-                )
-                if (removedNewDraft || removedCurrentDraft) {
-                    try {
-                        await store.save()
-                    } catch {
-                        return
-                    }
-                }
-                legacyStorage.removeItem(LEGACY_BACKUP_KEY)
                 return
             }
             if (storedCollection !== undefined) {
                 throw new Error('Unable to read the local draft collection')
             }
-
-            const migratedDraft =
-                parseDraftSnapshot(
-                    await store.get<unknown>(getDraftStoreKey(NEW_DRAFT_KEY))
-                ) ??
-                parseDraftSnapshot(
-                    await store.get<unknown>(CURRENT_DRAFT_KEY)
-                ) ??
-                parseLegacyBackup(legacyStorage.getItem(LEGACY_BACKUP_KEY))
-            const drafts = migratedDraft
-                ? [
-                      {
-                          localId: createId(),
-                          content: migratedDraft.content,
-                          createdAt: migratedDraft.updatedAt,
-                          updatedAt: migratedDraft.updatedAt,
-                      },
-                  ]
-                : []
-
             await store.set(LOCAL_DRAFT_COLLECTION_KEY, {
-                version: 1,
-                drafts,
+                version: 2,
+                drafts: [],
             } satisfies LocalDraftCollection)
-            try {
-                await store.save()
-            } catch (error) {
-                await store.delete(LOCAL_DRAFT_COLLECTION_KEY)
-                throw error
-            }
-
-            await store.delete(getDraftStoreKey(NEW_DRAFT_KEY))
-            await store.delete(CURRENT_DRAFT_KEY)
-            try {
-                await store.save()
-                if (migratedDraft) {
-                    legacyStorage.removeItem(LEGACY_BACKUP_KEY)
-                }
-            } catch {
-                // The migrated collection is already durable. Keep legacy
-                // sources so a future launch can retry cleanup safely.
-            }
+            await store.save()
         })()
         initializePromise = initialization.catch((error) => {
             initializePromise = undefined
@@ -291,14 +220,14 @@ export function createDraftRepository({
         return (
             parseLocalDraftCollection(
                 await store.get<unknown>(LOCAL_DRAFT_COLLECTION_KEY)
-            ) ?? {version: 1, drafts: []}
+            ) ?? {version: 2, drafts: []}
         )
     }
 
     const writeLocalDrafts = async (collection: LocalDraftCollection) => {
         const store = await getStore()
         await store.set(LOCAL_DRAFT_COLLECTION_KEY, {
-            version: 1,
+            version: 2,
             drafts: sortLocalDrafts(collection.drafts),
         } satisfies LocalDraftCollection)
         await store.save()
@@ -308,7 +237,7 @@ export function createDraftRepository({
         enqueueMutation(async () => {
             const collection = await readLocalDrafts()
             await writeLocalDrafts({
-                version: 1,
+                version: 2,
                 drafts: collection.drafts.filter(
                     (draft) => draft.localId !== localId
                 ),
@@ -337,10 +266,11 @@ export function createDraftRepository({
                     localId: createId(),
                     content,
                     createdAt: timestamp,
+                    themeId: null,
                     updatedAt: timestamp,
                 }
                 await writeLocalDrafts({
-                    version: 1,
+                    version: 2,
                     drafts: [draft, ...collection.drafts],
                 })
                 return draft
@@ -358,17 +288,19 @@ export function createDraftRepository({
                 )
                 return draft
                     ? {
-                          version: 1,
+                          version: 2,
                           content: draft.content,
+                          themeId: draft.themeId,
                           updatedAt: draft.updatedAt,
                       }
                     : null
             }
 
+            await mutationQueue
             const store = await getStore()
-            return parseDraftSnapshot(
-                await store.get<unknown>(getDraftStoreKey(documentKey))
-            )
+            const storeKey = getDraftStoreKey(documentKey)
+            const value = await store.get<unknown>(storeKey)
+            return parseDraftSnapshot(value)
         },
         removeLocalDraft,
         save: async (documentKey, snapshot) => {
@@ -383,10 +315,11 @@ export function createDraftRepository({
                         localId,
                         content: snapshot.content,
                         createdAt: existing?.createdAt ?? snapshot.updatedAt,
+                        themeId: snapshot.themeId,
                         updatedAt: snapshot.updatedAt,
                     }
                     await writeLocalDrafts({
-                        version: 1,
+                        version: 2,
                         drafts: [
                             draft,
                             ...collection.drafts.filter(

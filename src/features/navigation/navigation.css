@@ -53,25 +53,116 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
 }
 
 .sidebar-toggle {
-    width: 32px;
-    height: 32px;
     flex: 0 0 auto;
     color: hsl(var(--muted-foreground));
 }
 
-.sidebar-toggle svg {
-    width: 17px;
-    height: 17px;
-}
 
 .right-sidebar-toggle {
-    margin-left: auto;
+    margin-left: 12px;
 }
 
 .editor-toolbar-actions {
     display: flex;
     margin-left: auto;
+    justify-content: flex-end;
     align-items: center;
+    gap: 12px;
+}
+
+.theme-selector {
+    position: relative;
+}
+
+.theme-selector-trigger {
+    color: hsl(var(--muted-foreground));
+}
+
+.theme-selector-trigger:not(:disabled):hover,
+.theme-selector-trigger[aria-expanded='true'] {
+    color: hsl(var(--foreground));
+}
+
+.theme-selector-trigger:disabled {
+    opacity: 0.5;
+}
+
+.theme-selector-label {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    display:inline-block;
+    margin-left:3px;
+    white-space: nowrap;
+}
+
+.theme-selector-menu {
+    position: absolute;
+    z-index: 80;
+    top: calc(100% + 6px);
+    right: 0;
+    width: max-content;
+    min-width: 180px;
+    max-width: min(320px, calc(100vw - 24px));
+    max-height: min(360px, calc(100vh - 70px));
+    padding: 5px;
+    overflow-y: auto;
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    color: hsl(var(--popover-foreground));
+    background: hsl(var(--popover));
+    box-shadow: 0 10px 30px hsl(0 0% 0% / 0.18);
+}
+
+.theme-selector-item {
+    display: flex;
+    width: 100%;
+    min-height: 34px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 9px;
+    border-radius: 5px;
+    color: inherit;
+    background: transparent;
+    font-size: 13px;
+    text-align: left;
+}
+
+.theme-selector-item:hover,
+.theme-selector-item:focus-visible {
+    outline: 0;
+    background: hsl(var(--accent));
+}
+
+.theme-selector-item span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.theme-selector-item svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+}
+
+.theme-selector-item.is-clear {
+    color: hsl(var(--muted-foreground));
+}
+
+.theme-selector-separator {
+    height: 1px;
+    margin: 4px;
+    background: hsl(var(--border));
+}
+
+.theme-selector-state {
+    padding: 10px 9px;
+    color: hsl(var(--muted-foreground));
+    font-size: 13px;
 }
 
 .editor-toolbar-actions + .right-sidebar-toggle {
