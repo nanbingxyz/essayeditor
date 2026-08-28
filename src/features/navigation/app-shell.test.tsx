@@ -48,6 +48,7 @@ function renderShell(initialState: AccountState) {
                 onOpenSettings={vi.fn()}
                 onSelectedDateChange={vi.fn()}
                 page="editor"
+                rightSidebarContent={<div>Notes</div>}
                 selectedDate={null}
                 sidebarContent={<div>Article list</div>}
             >

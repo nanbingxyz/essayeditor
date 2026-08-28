@@ -702,9 +702,10 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
 }
 
 .right-sidebar-content {
+    display: flex;
     min-height: 0;
     flex: 1;
-    overflow: auto;
+    overflow: hidden;
 }
 
 .right-sidebar-resizer {

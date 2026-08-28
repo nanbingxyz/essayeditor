@@ -9,5 +9,6 @@ export type {
 } from './draft-repository'
 export {default as DeleteDocumentButton} from './delete-document-button'
 export {default as EditorPage} from './editor-page'
+export {default as MarkdownEditor} from './markdown-editor'
 export {useDraftController} from './use-draft-controller'
 export type {MarkdownEditorHandle} from './markdown-editor'

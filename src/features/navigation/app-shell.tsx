@@ -30,6 +30,7 @@ interface AppShellProps {
     onOpenSettings: () => void
     onSelectedDateChange: (date: string | null) => void
     page: AppPage
+    rightSidebarContent: ReactNode
     selectedDate: string | null
     sidebarContent: ReactNode
     storeReady: boolean
@@ -73,6 +74,7 @@ export default function AppShell({
     onOpenSettings,
     onSelectedDateChange,
     page,
+    rightSidebarContent,
     selectedDate,
     sidebarContent,
     storeReady,
@@ -224,14 +226,14 @@ export default function AppShell({
                             className="sidebar-toggle right-sidebar-toggle"
                             aria-label={
                                 layout.rightSidebarVisible
-                                    ? '收起私人笔记侧边栏'
-                                    : '显示私人笔记侧边栏'
+                                    ? '收起笔记侧边栏'
+                                    : '显示笔记侧边栏'
                             }
                             aria-expanded={layout.rightSidebarVisible}
                             title={
                                 layout.rightSidebarVisible
-                                    ? '收起私人笔记侧边栏'
-                                    : '显示私人笔记侧边栏'
+                                    ? '收起笔记侧边栏'
+                                    : '显示笔记侧边栏'
                             }
                             onClick={layout.toggleRightSidebar}
                         >
@@ -251,12 +253,12 @@ export default function AppShell({
                 <aside
                     className="app-right-sidebar"
                     style={rightSidebarStyle}
-                    aria-label="私人笔记侧边栏"
+                    aria-label="笔记侧边栏"
                 >
                     <div
                         className="right-sidebar-resizer"
                         role="separator"
-                        aria-label="调整私人笔记侧边栏宽度"
+                        aria-label="调整笔记侧边栏宽度"
                         aria-orientation="vertical"
                         aria-valuemin={MIN_RIGHT_SIDEBAR_WIDTH}
                         aria-valuemax={Math.min(
@@ -280,11 +282,9 @@ export default function AppShell({
                             layout.stopRightSidebarResize()
                         }
                     />
-                    <div
-                        data-tauri-drag-region
-                        className="titlebar-surface right-sidebar-titlebar"
-                    />
-                    <div className="right-sidebar-content" />
+                    <div className="right-sidebar-content">
+                        {rightSidebarContent}
+                    </div>
                 </aside>
             )}
         </div>

@@ -30,6 +30,7 @@ export interface MarkdownEditorHandle {
 }
 
 interface MarkdownEditorProps {
+    ariaLabel?: string
     disabled?: boolean
     initialValue?: string
     onChange?: (content: string) => void
@@ -39,6 +40,7 @@ interface MarkdownEditorProps {
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     (
         {
+            ariaLabel = '文章内容',
             disabled = false,
             initialValue = '',
             onChange,
@@ -126,7 +128,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
                             revealSyntaxOnInitialSelection: false,
                         }),
                         EditorView.contentAttributes.of({
-                            'aria-label': '文章内容',
+                            'aria-label': ariaLabel,
                             'aria-multiline': 'true',
                         }),
                         EditorView.updateListener.of((update) => {

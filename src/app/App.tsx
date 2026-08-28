@@ -31,6 +31,12 @@ import {
     useSidebarLayout,
 } from '@/features/navigation'
 import {
+    createNoteCacheRepository,
+    createNoteClient,
+    NoteSidebar,
+    useNoteController,
+} from '@/features/notes'
+import {
     createEssayClient,
     usePublishingController,
 } from '@/features/publishing'
@@ -132,6 +138,11 @@ export default function App() {
         []
     )
     const themeCacheRepository = useMemo(createThemeCacheRepository, [])
+    const noteClient = useMemo(
+        () => createNoteClient({baseUrl: essayApiBaseUrl}),
+        []
+    )
+    const noteCacheRepository = useMemo(createNoteCacheRepository, [])
 
     localDraftsRef.current = localDrafts
 
@@ -334,6 +345,25 @@ export default function App() {
     const layout = useSidebarLayout({
         page,
         onLayoutChange: requestEditorMeasure,
+    })
+
+    const notifyNoteError = useCallback(
+        (message: string) => {
+            toast({
+                title: '无法同步笔记',
+                description: message,
+                variant: 'destructive',
+            })
+        },
+        [toast]
+    )
+    const notes = useNoteController({
+        accessToken: settings.accessToken,
+        active: layout.rightSidebarVisible,
+        cacheRepository: noteCacheRepository,
+        client: noteClient,
+        enabled: Boolean(settings.ready && settings.accessToken),
+        onError: notifyNoteError,
     })
 
     useEffect(() => {
@@ -888,6 +918,27 @@ export default function App() {
             onOpenSettings={openSettings}
             onSelectedDateChange={(date) => void changeSelectedDate(date)}
             page={page}
+            rightSidebarContent={
+                <NoteSidebar
+                    enabled={Boolean(settings.ready && settings.accessToken)}
+                    error={notes.error}
+                    folders={notes.folders}
+                    hasMore={notes.hasMore}
+                    loading={notes.loading}
+                    loadingMore={notes.loadingMore}
+                    moreError={notes.moreError}
+                    mutating={notes.mutating}
+                    notes={notes.notes}
+                    onCreate={notes.createNote}
+                    onLoadMore={() => void notes.loadMore()}
+                    onOpenSettings={openSettings}
+                    onRefresh={() => void notes.refresh()}
+                    onRemove={notes.removeNote}
+                    onRetry={() => void notes.retry()}
+                    onUpdate={notes.updateNote}
+                    refreshing={notes.refreshing}
+                />
+            }
             selectedDate={selectedDate}
             sidebarContent={
                 <SidebarEssayList
