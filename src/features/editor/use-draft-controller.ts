@@ -8,6 +8,7 @@ const DRAFT_SAVE_DELAY = 1000
 
 interface DraftControllerOptions {
     baselineContent: string
+    baselineIsPrivate?: boolean
     baselineThemeId?: number | null
     documentKey: string
     onError: () => void
@@ -17,14 +18,17 @@ interface DraftControllerOptions {
 
 interface PendingSave {
     baselineContent: string
+    baselineIsPrivate: boolean
     baselineThemeId: number | null
     content: string
     documentKey: string
+    isPrivate: boolean
     themeId: number | null
 }
 
 export function useDraftController({
     baselineContent,
+    baselineIsPrivate = false,
     baselineThemeId = null,
     documentKey,
     onError,
@@ -33,6 +37,7 @@ export function useDraftController({
 }: DraftControllerOptions) {
     const [content, setContent] = useState('')
     const [initialContent, setInitialContent] = useState('')
+    const [isPrivate, setIsPrivate] = useState(false)
     const [themeId, setThemeId] = useState<number | null>(null)
     const [loadedIdentity, setLoadedIdentity] = useState('')
     const [updatedAt, setUpdatedAt] = useState(0)
@@ -40,32 +45,39 @@ export function useDraftController({
 
     const onErrorRef = useRef(onError)
     const baselineContentRef = useRef(baselineContent)
+    const baselineIsPrivateRef = useRef(baselineIsPrivate)
     const baselineThemeIdRef = useRef(baselineThemeId)
     const documentKeyRef = useRef(documentKey)
     const latestContentRef = useRef('')
+    const latestIsPrivateRef = useRef(false)
     const latestThemeIdRef = useRef<number | null>(null)
     const persistedContentRef = useRef('')
+    const persistedIsPrivateRef = useRef(false)
     const persistedThemeIdRef = useRef<number | null>(null)
     const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true))
     const needsSaveRef = useRef(false)
     const pendingSaveRef = useRef<PendingSave | null>(null)
 
     onErrorRef.current = onError
-    const documentIdentity = `${documentKey}\u0000${baselineContent}\u0000${baselineThemeId ?? ''}`
+    const documentIdentity = `${documentKey}\u0000${baselineContent}\u0000${baselineThemeId ?? ''}\u0000${baselineIsPrivate}`
 
     const enqueueSave = useCallback(
         ({
             baselineContent,
+            baselineIsPrivate,
             baselineThemeId,
             content,
             documentKey,
+            isPrivate,
             themeId,
         }: PendingSave) => {
             const pending = {
                 baselineContent,
+                baselineIsPrivate,
                 baselineThemeId,
                 content,
                 documentKey,
+                isPrivate,
                 themeId,
             }
             pendingSaveRef.current = pending
@@ -73,6 +85,7 @@ export function useDraftController({
             const snapshot: DraftSnapshot = {
                 version: 2,
                 content,
+                isPrivate,
                 themeId,
                 updatedAt: timestamp,
             }
@@ -81,6 +94,7 @@ export function useDraftController({
                 try {
                     if (
                         content === baselineContent &&
+                        isPrivate === baselineIsPrivate &&
                         themeId === baselineThemeId &&
                         !persistBaseline
                     ) {
@@ -92,13 +106,16 @@ export function useDraftController({
                     if (
                         documentKey === documentKeyRef.current &&
                         content === latestContentRef.current &&
+                        isPrivate === latestIsPrivateRef.current &&
                         themeId === latestThemeIdRef.current
                     ) {
                         persistedContentRef.current = content
+                        persistedIsPrivateRef.current = isPrivate
                         persistedThemeIdRef.current = themeId
                         needsSaveRef.current = false
                         setUpdatedAt(
                             content === baselineContent &&
+                                isPrivate === baselineIsPrivate &&
                                 themeId === baselineThemeId &&
                                 !persistBaseline
                                 ? 0
@@ -143,9 +160,11 @@ export function useDraftController({
             setContent(content)
             scheduleSave({
                 baselineContent: baselineContentRef.current,
+                baselineIsPrivate: baselineIsPrivateRef.current,
                 baselineThemeId: baselineThemeIdRef.current,
                 content,
                 documentKey: documentKeyRef.current,
+                isPrivate: latestIsPrivateRef.current,
                 themeId: latestThemeIdRef.current,
             })
         },
@@ -159,10 +178,30 @@ export function useDraftController({
             setThemeId(nextThemeId)
             scheduleSave({
                 baselineContent: baselineContentRef.current,
+                baselineIsPrivate: baselineIsPrivateRef.current,
                 baselineThemeId: baselineThemeIdRef.current,
                 content: latestContentRef.current,
                 documentKey: documentKeyRef.current,
+                isPrivate: latestIsPrivateRef.current,
                 themeId: nextThemeId,
+            })
+        },
+        [scheduleSave]
+    )
+
+    const onPrivateChange = useCallback(
+        (nextIsPrivate: boolean) => {
+            latestIsPrivateRef.current = nextIsPrivate
+            needsSaveRef.current = true
+            setIsPrivate(nextIsPrivate)
+            scheduleSave({
+                baselineContent: baselineContentRef.current,
+                baselineIsPrivate: baselineIsPrivateRef.current,
+                baselineThemeId: baselineThemeIdRef.current,
+                content: latestContentRef.current,
+                documentKey: documentKeyRef.current,
+                isPrivate: nextIsPrivate,
+                themeId: latestThemeIdRef.current,
             })
         },
         [scheduleSave]
@@ -176,6 +215,8 @@ export function useDraftController({
                 pending?.documentKey === documentKeyRef.current &&
                 pending.content === latestContentRef.current &&
                 pending.baselineContent === baselineContentRef.current &&
+                pending.isPrivate === latestIsPrivateRef.current &&
+                pending.baselineIsPrivate === baselineIsPrivateRef.current &&
                 pending.themeId === latestThemeIdRef.current &&
                 pending.baselineThemeId === baselineThemeIdRef.current
             ) {
@@ -183,9 +224,11 @@ export function useDraftController({
             }
             return enqueueSave({
                 baselineContent: baselineContentRef.current,
+                baselineIsPrivate: baselineIsPrivateRef.current,
                 baselineThemeId: baselineThemeIdRef.current,
                 content: latestContentRef.current,
                 documentKey: documentKeyRef.current,
+                isPrivate: latestIsPrivateRef.current,
                 themeId: latestThemeIdRef.current,
             })
         }
@@ -197,6 +240,7 @@ export function useDraftController({
         try {
             await repository.clear(documentKeyRef.current)
             persistedContentRef.current = baselineContentRef.current
+            persistedIsPrivateRef.current = baselineIsPrivateRef.current
             persistedThemeIdRef.current = baselineThemeIdRef.current
             needsSaveRef.current = false
             setUpdatedAt(0)
@@ -213,10 +257,13 @@ export function useDraftController({
         let cancelled = false
         documentKeyRef.current = documentKey
         baselineContentRef.current = baselineContent
+        baselineIsPrivateRef.current = baselineIsPrivate
         baselineThemeIdRef.current = baselineThemeId
         latestContentRef.current = baselineContent
+        latestIsPrivateRef.current = baselineIsPrivate
         latestThemeIdRef.current = baselineThemeId
         persistedContentRef.current = baselineContent
+        persistedIsPrivateRef.current = baselineIsPrivate
         persistedThemeIdRef.current = baselineThemeId
         needsSaveRef.current = false
         pendingSaveRef.current = null
@@ -230,26 +277,34 @@ export function useDraftController({
                     return
                 }
                 const effectiveContent = draft?.content ?? baselineContent
+                const effectiveIsPrivate = draft
+                    ? draft.isPrivate === true
+                    : baselineIsPrivate
                 const effectiveThemeId = draft
                     ? draft.themeId
                     : baselineThemeId
                 latestContentRef.current = effectiveContent
+                latestIsPrivateRef.current = effectiveIsPrivate
                 latestThemeIdRef.current = effectiveThemeId
                 persistedContentRef.current = effectiveContent
+                persistedIsPrivateRef.current = effectiveIsPrivate
                 persistedThemeIdRef.current = effectiveThemeId
                 setContent(effectiveContent)
                 setInitialContent(effectiveContent)
+                setIsPrivate(effectiveIsPrivate)
                 setThemeId(effectiveThemeId)
                 setUpdatedAt(
                     draft &&
                         (persistBaseline ||
                             draft.content !== baselineContent ||
+                            effectiveIsPrivate !== baselineIsPrivate ||
                             effectiveThemeId !== baselineThemeId)
                         ? draft.updatedAt
                         : 0
                 )
                 if (
                     draft?.content === baselineContent &&
+                    effectiveIsPrivate === baselineIsPrivate &&
                     effectiveThemeId === baselineThemeId &&
                     !persistBaseline
                 ) {
@@ -260,10 +315,13 @@ export function useDraftController({
                 if (!cancelled) {
                     latestContentRef.current = baselineContent
                     persistedContentRef.current = baselineContent
+                    latestIsPrivateRef.current = baselineIsPrivate
+                    persistedIsPrivateRef.current = baselineIsPrivate
                     latestThemeIdRef.current = baselineThemeId
                     persistedThemeIdRef.current = baselineThemeId
                     setContent(baselineContent)
                     setInitialContent(baselineContent)
+                    setIsPrivate(baselineIsPrivate)
                     setThemeId(baselineThemeId)
                     setUpdatedAt(0)
                     onErrorRef.current()
@@ -282,6 +340,7 @@ export function useDraftController({
         }
     }, [
         baselineContent,
+        baselineIsPrivate,
         baselineThemeId,
         documentIdentity,
         documentKey,
@@ -295,7 +354,9 @@ export function useDraftController({
         content,
         flush,
         initialContent,
+        isPrivate,
         onContentChange,
+        onPrivateChange,
         onThemeChange,
         ready: ready && loadedIdentity === documentIdentity,
         themeId,

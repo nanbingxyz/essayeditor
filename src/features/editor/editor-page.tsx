@@ -1,10 +1,11 @@
-import {ShadowInnerIcon} from '@radix-ui/react-icons'
-import {Send20Filled} from '@fluentui/react-icons'
-import {forwardRef} from 'react'
-import {Button} from '@/shared/ui'
-import {getRelativeTime} from '@/shared/lib/timing'
+import { ShadowInnerIcon } from '@radix-ui/react-icons'
+import { Send20Filled, EyeOff20Filled, EyeOff20Regular } from '@fluentui/react-icons'
+import { forwardRef } from 'react'
+import { Button, Toggle } from '@/shared/ui'
+import { getRelativeTime } from '@/shared/lib/timing'
 
-import MarkdownEditor, {type MarkdownEditorHandle} from './markdown-editor'
+import MarkdownEditor, { type MarkdownEditorHandle } from './markdown-editor'
+import { cn } from '@/shared/lib'
 
 interface EditorPageProps {
     active: boolean
@@ -13,8 +14,10 @@ interface EditorPageProps {
     disabled: boolean
     editorKey: string
     initialContent: string
+    isPrivate: boolean
     loading: boolean
     onContentChange: (content: string) => void
+    onPrivateChange: (isPrivate: boolean) => void
     onPublish: () => void
     publishReady: boolean
     ready: boolean
@@ -29,8 +32,10 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
             disabled,
             editorKey,
             initialContent,
+            isPrivate,
             loading,
             onContentChange,
+            onPrivateChange,
             onPublish,
             publishReady,
             ready,
@@ -61,21 +66,40 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
                         </span>
                     )}
                 </div>
-                <Button
-                    type="button"
-                    size="icon"
-                    className="publish-button rounded-full"
-                    aria-label={actionLabel}
-                    title={actionLabel === '更新文章' ? '更新' : '发布'}
-                    disabled={disabled || !publishReady}
-                    onClick={onPublish}
-                >
-                    {loading ? (
-                        <ShadowInnerIcon className="animate-spin" />
-                    ) : (
-                        <Send20Filled className="ml-0.5 -rotate-[18deg]" />
-                    )}
-                </Button>
+                <div className="editor-publish-actions">
+                    <Toggle
+                        type="button"
+                        size="sm"
+                        className={cn("text-xs rounded-full", isPrivate?'text-primary-foreground':'text-muted-foreground')}
+                        variant="default"
+                        pressed={isPrivate}
+                        aria-label="仅自己可见"
+                        disabled={disabled || !ready}
+                        onPressedChange={onPrivateChange}
+                    >
+                        {isPrivate ? (
+                            <EyeOff20Filled />
+                        ) : (
+                            <EyeOff20Regular />
+                        )}
+                        仅自己可见
+                    </Toggle>
+                    <Button
+                        type="button"
+                        size="icon"
+                        className="publish-button rounded-full"
+                        aria-label={actionLabel}
+                        title={actionLabel === '更新文章' ? '更新' : '发布'}
+                        disabled={disabled || !publishReady}
+                        onClick={onPublish}
+                    >
+                        {loading ? (
+                            <ShadowInnerIcon className="animate-spin" />
+                        ) : (
+                            <Send20Filled className="ml-0.5 -rotate-[18deg]" />
+                        )}
+                    </Button>
+                </div>
             </footer>
         </div>
     )

@@ -19,6 +19,7 @@ export function usePublishingController({
         async (
             content: string,
             themeId: number | null,
+            isPrivate: boolean,
             accessToken: string
         ) => {
             setLoading(true)
@@ -26,6 +27,7 @@ export function usePublishingController({
                 const {id} = await client.publish(
                     content,
                     themeId,
+                    isPrivate,
                     accessToken
                 )
                 await onSuccess(id)

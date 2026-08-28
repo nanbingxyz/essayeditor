@@ -56,6 +56,7 @@ function essays(count: number, offset = 0): EssayListItem[] {
     return Array.from({length: count}, (_, index) => ({
         id: String(index + offset),
         content: `published ${index + offset}`,
+        isPrivate: false,
         themeSlug: null,
     }))
 }
@@ -402,6 +403,7 @@ describe('useEssayLibraryController', () => {
             {
                 id: 'themed-essay',
                 content: 'themed',
+                isPrivate: false,
                 themeId: 6,
                 themeSlug: 'theme-six',
             },
@@ -452,6 +454,7 @@ describe('useEssayLibraryController', () => {
             {
                 id: '10',
                 content: 'published 10',
+                isPrivate: false,
                 themeId: null,
                 themeSlug: null,
             },
@@ -511,20 +514,34 @@ describe('useEssayLibraryController', () => {
         })
 
         act(() => {
-            getController().commitPublish('1', 'newly published', 3, 'tech')
-            getController().commitPublish('1', 'newly published', 3, 'tech')
+            getController().commitPublish(
+                '1',
+                'newly published',
+                false,
+                3,
+                'tech'
+            )
+            getController().commitPublish(
+                '1',
+                'newly published',
+                false,
+                3,
+                'tech'
+            )
         })
 
         expect(getController().entries).toEqual([
             {
                 id: '1',
                 content: 'newly published',
+                isPrivate: false,
                 themeId: 3,
                 themeSlug: 'tech',
             },
             {
                 id: '0',
                 content: 'published 0',
+                isPrivate: false,
                 themeId: null,
                 themeSlug: null,
             },
@@ -555,12 +572,14 @@ describe('useEssayLibraryController', () => {
             {
                 id: '0',
                 content: 'published 0',
+                isPrivate: false,
                 themeId: null,
                 themeSlug: null,
             },
             {
                 id: '2',
                 content: 'published 2',
+                isPrivate: false,
                 themeId: null,
                 themeSlug: null,
             },

@@ -14,6 +14,7 @@ export interface EssayClient {
     publish: (
         content: string,
         themeId: number | null,
+        isPrivate: boolean,
         accessToken: string
     ) => Promise<{id: string}>
 }
@@ -56,7 +57,7 @@ export function createEssayClient(
     const essaysUrl = `${baseUrl.replace(/\/+$/, '')}/essays`
 
     return {
-        publish: async (content, themeId, accessToken) => {
+        publish: async (content, themeId, isPrivate, accessToken) => {
             let response: Response
             try {
                 response = await httpClient(essaysUrl, {
@@ -65,7 +66,11 @@ export function createEssayClient(
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${accessToken}`,
                     },
-                    body: JSON.stringify({content, theme_id: themeId}),
+                    body: JSON.stringify({
+                        content,
+                        theme_id: themeId,
+                        is_private: isPrivate,
+                    }),
                 })
             } catch {
                 throw new EssayPublishError('网络连接失败，请稍后重试')

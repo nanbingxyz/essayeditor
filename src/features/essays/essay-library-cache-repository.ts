@@ -40,6 +40,7 @@ export interface EssayLibraryCacheRepository {
         accessToken: string,
         essayId: string,
         content: string,
+        isPrivate: boolean,
         themeSlug: string | null
     ) => Promise<void>
 }
@@ -73,6 +74,10 @@ function parseEssay(value: unknown): EssayListItem | null {
         !candidate.id ||
         typeof candidate.content !== 'string' ||
         !(
+            candidate.isPrivate === undefined ||
+            typeof candidate.isPrivate === 'boolean'
+        ) ||
+        !(
             candidate.themeSlug === null ||
             (typeof candidate.themeSlug === 'string' &&
                 Boolean(candidate.themeSlug))
@@ -83,6 +88,7 @@ function parseEssay(value: unknown): EssayListItem | null {
     return {
         id: candidate.id,
         content: candidate.content,
+        isPrivate: candidate.isPrivate === true,
         themeSlug: candidate.themeSlug,
     }
 }
@@ -285,12 +291,18 @@ export function createEssayLibraryCacheRepository({
                     ],
                 })
             }),
-        updateEssay: (accessToken, essayId, content, themeSlug) =>
+        updateEssay: (
+            accessToken,
+            essayId,
+            content,
+            isPrivate,
+            themeSlug
+        ) =>
             mutateAccount(accessToken, (snapshot) => ({
                 ...snapshot,
                 entries: snapshot.entries.map((entry) =>
                     entry.id === essayId
-                        ? {id: essayId, content, themeSlug}
+                        ? {id: essayId, content, isPrivate, themeSlug}
                         : entry
                 ),
             })),

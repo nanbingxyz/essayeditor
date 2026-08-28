@@ -114,7 +114,7 @@ describe('App navigation', () => {
         act(() => (settingsButton as HTMLButtonElement).click())
         expect(container.querySelector('.settings-page-container')?.className)
             .not.toContain('is-page-hidden')
-        expect(container.textContent).toContain('管理 EssayEditor 的本地设置')
+        expect(container.textContent).toContain('Essay Editor 的本地设置')
 
         const backButton = container.querySelector(
             'button[aria-label="返回编辑器"]'
@@ -312,6 +312,7 @@ describe('App navigation', () => {
                 body: JSON.stringify({
                     content: 'Publish me',
                     theme_id: null,
+                    is_private: false,
                 }),
             })
         )
@@ -405,6 +406,13 @@ describe('App navigation', () => {
                 ) as HTMLButtonElement
             ).click()
         )
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="仅自己可见"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
 
         await act(async () => {
             (
@@ -422,12 +430,13 @@ describe('App navigation', () => {
                 body: JSON.stringify({
                     content: 'Themed essay',
                     theme_id: 12,
+                    is_private: true,
                 }),
             })
         )
     })
 
-    it('echoes a published theme by matching theme_slug to the theme list', async () => {
+    it('echoes a published theme and private state', async () => {
         storeFiles.set(
             'store.bin',
             new Map([
@@ -436,7 +445,7 @@ describe('App navigation', () => {
             ])
         )
         httpFetch.mockImplementation(
-            async (input: string | URL | Request) => {
+            async (input: string | URL | Request, init?: RequestInit) => {
                 const url = String(input)
                 if (url.includes('/heatmap?')) {
                     return new Response(
@@ -468,10 +477,17 @@ describe('App navigation', () => {
                             {
                                 id: 'themed-essay',
                                 content: 'Published with theme',
+                                is_private: true,
                                 theme_slug: 'technology',
                             },
                         ])
                     )
+                }
+                if (
+                    url.endsWith('/essays/themed-essay') &&
+                    init?.method === 'PUT'
+                ) {
+                    return new Response(null, {status: 204})
                 }
                 throw new Error(`Unexpected request: ${url}`)
             }
@@ -497,6 +513,39 @@ describe('App navigation', () => {
         expect(
             container.querySelector('button[aria-label="频道：技术"]')
         ).not.toBeNull()
+        expect(
+            container
+                .querySelector('button[aria-label="仅自己可见"]')
+                ?.getAttribute('aria-pressed')
+        ).toBe('true')
+
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="仅自己可见"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => {
+            (
+                container.querySelector(
+                    'button[aria-label="更新文章"]'
+                ) as HTMLButtonElement
+            ).click()
+            await settle(12)
+        })
+
+        expect(httpFetch).toHaveBeenCalledWith(
+            expect.stringMatching(/\/essays\/themed-essay$/),
+            expect.objectContaining({
+                method: 'PUT',
+                body: JSON.stringify({
+                    content: 'Published with theme',
+                    theme_id: 12,
+                    is_private: false,
+                }),
+            })
+        )
     })
 
     it('requires confirmation before deleting a local draft and selects the first remaining draft', async () => {

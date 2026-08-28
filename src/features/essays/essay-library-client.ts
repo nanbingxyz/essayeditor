@@ -5,6 +5,7 @@ const PAGE_SIZE = 20
 export interface EssayListItem {
     id: string
     content: string
+    isPrivate?: boolean
     themeSlug: string | null
 }
 
@@ -27,6 +28,7 @@ export interface EssayLibraryClient {
         essayId: string,
         content: string,
         themeId: number | null,
+        isPrivate: boolean,
         accessToken: string,
         signal?: AbortSignal
     ) => Promise<void>
@@ -75,11 +77,15 @@ function readEssayList(payload: unknown): EssayListItem[] | null {
         const {
             id,
             content,
+            is_private: snakeCaseIsPrivate,
+            isPrivate: camelCaseIsPrivate,
             theme_slug: snakeCaseThemeSlug,
             themeSlug: camelCaseThemeSlug,
         } = value as {
             id?: unknown
             content?: unknown
+            is_private?: unknown
+            isPrivate?: unknown
             theme_slug?: unknown
             themeSlug?: unknown
         }
@@ -87,10 +93,18 @@ function readEssayList(payload: unknown): EssayListItem[] | null {
             snakeCaseThemeSlug === undefined
                 ? camelCaseThemeSlug
                 : snakeCaseThemeSlug
+        const isPrivate =
+            snakeCaseIsPrivate === undefined
+                ? camelCaseIsPrivate
+                : snakeCaseIsPrivate
         if (
             typeof id !== 'string' ||
             !id.trim() ||
             typeof content !== 'string' ||
+            !(
+                isPrivate === undefined ||
+                typeof isPrivate === 'boolean'
+            ) ||
             !(
                 themeSlug === undefined ||
                 themeSlug === null ||
@@ -103,6 +117,7 @@ function readEssayList(payload: unknown): EssayListItem[] | null {
         essays.push({
             id: id.trim(),
             content,
+            isPrivate: isPrivate === true,
             themeSlug:
                 typeof themeSlug === 'string' ? themeSlug.trim() : null,
         })
@@ -182,7 +197,14 @@ export function createEssayLibraryClient({
                 )
             }
         },
-        update: async (essayId, content, themeId, accessToken, signal) => {
+        update: async (
+            essayId,
+            content,
+            themeId,
+            isPrivate,
+            accessToken,
+            signal
+        ) => {
             let response: Response
             try {
                 response = await httpClient(
@@ -193,7 +215,11 @@ export function createEssayLibraryClient({
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${accessToken}`,
                         },
-                        body: JSON.stringify({content, theme_id: themeId}),
+                        body: JSON.stringify({
+                            content,
+                            theme_id: themeId,
+                            is_private: isPrivate,
+                        }),
                         signal,
                     }
                 )

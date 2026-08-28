@@ -57,12 +57,14 @@ type ActiveDocument =
         kind: 'published'
         content: string
         id: string
+        isPrivate: boolean
         themeId: number | null
         themeSlug: string | null
     }
 
 interface PendingPublish {
     content: string
+    isPrivate: boolean
     localId: string
     themeId: number | null
     themeSlug: string | null
@@ -87,6 +89,7 @@ function createRecoveryDraft(): LocalDraft {
         localId: `recovery-${timestamp}`,
         content: '',
         createdAt: timestamp,
+        isPrivate: false,
         themeId: null,
         updatedAt: timestamp,
     }
@@ -172,6 +175,10 @@ export default function App() {
             activeDocument?.kind === 'published'
                 ? activeDocument.content
                 : '',
+        baselineIsPrivate:
+            activeDocument?.kind === 'published'
+                ? activeDocument.isPrivate
+                : false,
         baselineThemeId:
             activeDocument?.kind === 'published'
                 ? activeDocument.themeId
@@ -267,6 +274,7 @@ export default function App() {
                         kind: 'published',
                         id,
                         content: publishedDraft.content,
+                        isPrivate: publishedDraft.isPrivate,
                         themeId: publishedDraft.themeId,
                         themeSlug: publishedDraft.themeSlug,
                     }
@@ -275,6 +283,7 @@ export default function App() {
             library.commitPublish(
                 id,
                 publishedDraft.content,
+                publishedDraft.isPrivate,
                 publishedDraft.themeId,
                 publishedDraft.themeSlug
             )
@@ -382,6 +391,7 @@ export default function App() {
                         ? {
                             ...entry,
                             content: draft.content,
+                            isPrivate: draft.isPrivate,
                             themeId: draft.themeId,
                             updatedAt: draft.updatedAt || entry.updatedAt,
                         }
@@ -395,6 +405,7 @@ export default function App() {
             ? activeDocument.localId
             : null,
         draft.content,
+        draft.isPrivate,
         draft.ready,
         draft.themeId,
         draft.updatedAt,
@@ -455,12 +466,14 @@ export default function App() {
             pendingPublishRef.current = {
                 localId: activeDocument.localId,
                 content,
+                isPrivate: draft.isPrivate,
                 themeId: draft.themeId,
                 themeSlug,
             }
             const published = await publishing.publish(
                 content,
                 draft.themeId,
+                draft.isPrivate,
                 settings.accessToken
             )
             if (!published) {
@@ -470,6 +483,7 @@ export default function App() {
         }
         if (
             content === activeDocument.content &&
+            draft.isPrivate === activeDocument.isPrivate &&
             draft.themeId === activeDocument.themeId
         ) {
             return
@@ -481,12 +495,14 @@ export default function App() {
                 activeDocument.id,
                 content,
                 draft.themeId,
+                draft.isPrivate,
                 settings.accessToken
             )
             await draft.clear()
             library.commitUpdate(
                 activeDocument.id,
                 content,
+                draft.isPrivate,
                 draft.themeId,
                 themeSlug
             )
@@ -494,6 +510,7 @@ export default function App() {
                 kind: 'published',
                 id: activeDocument.id,
                 content,
+                isPrivate: draft.isPrivate,
                 themeId: draft.themeId,
                 themeSlug,
             })
@@ -536,6 +553,7 @@ export default function App() {
                 kind: 'published',
                 id: firstEssay.id,
                 content: firstEssay.content,
+                isPrivate: firstEssay.isPrivate === true,
                 themeId: firstEssay.themeId,
                 themeSlug: firstEssay.themeSlug,
             })
@@ -620,7 +638,10 @@ export default function App() {
         }
 
         const emptyDraft = localDraftsRef.current.find(
-            (entry) => !entry.content.trim() && entry.themeId === null
+            (entry) =>
+                !entry.content.trim() &&
+                !entry.isPrivate &&
+                entry.themeId === null
         )
         if (emptyDraft) {
             setActiveDocument(activateDraft(emptyDraft))
@@ -670,6 +691,7 @@ export default function App() {
             kind: 'published',
             id: essay.id,
             content: essay.content,
+            isPrivate: essay.isPrivate === true,
             themeId: essay.themeId,
             themeSlug: essay.themeSlug,
         })
@@ -705,9 +727,11 @@ export default function App() {
         library.setLocalDraft(
             activeDocument.id,
             content,
+            draft.isPrivate,
             draft.themeId,
             content !== activeDocument.content ||
-            draft.themeId !== activeDocument.themeId
+                draft.isPrivate !== activeDocument.isPrivate ||
+                draft.themeId !== activeDocument.themeId
         )
     }
 
@@ -734,9 +758,42 @@ export default function App() {
         library.setLocalDraft(
             activeDocument.id,
             content,
+            draft.isPrivate,
             themeId,
             content !== activeDocument.content ||
+            draft.isPrivate !== activeDocument.isPrivate ||
             themeId !== activeDocument.themeId
+        )
+    }
+
+    const handlePrivateChange = (isPrivate: boolean) => {
+        if (!activeDocument) {
+            return
+        }
+        draft.onPrivateChange(isPrivate)
+        if (activeDocument.kind === 'draft') {
+            const updatedAt = Date.now()
+            setActiveDocument({...activeDocument, isPrivate, updatedAt})
+            setLocalDrafts((current) =>
+                sortDrafts(
+                    current.map((entry) =>
+                        entry.localId === activeDocument.localId
+                            ? {...entry, isPrivate, updatedAt}
+                            : entry
+                    )
+                )
+            )
+            return
+        }
+        const content = editorRef.current?.getValue() ?? draft.content
+        library.setLocalDraft(
+            activeDocument.id,
+            content,
+            isPrivate,
+            draft.themeId,
+            content !== activeDocument.content ||
+                isPrivate !== activeDocument.isPrivate ||
+                draft.themeId !== activeDocument.themeId
         )
     }
 
@@ -750,7 +807,9 @@ export default function App() {
         activeDocument?.kind === 'published'
             ? getPublishedDocumentStatus({
                 baselineContent: activeDocument.content,
+                baselineIsPrivate: activeDocument.isPrivate,
                 currentContent: draft.content,
+                currentIsPrivate: draft.isPrivate,
                 baselineThemeId: activeDocument.themeId,
                 currentThemeId: draft.themeId,
                 draftReady: draft.ready,
@@ -873,8 +932,10 @@ export default function App() {
                 disabled={publishing.loading || updating || deleting}
                 editorKey={activeDocumentKey}
                 initialContent={draft.initialContent}
+                isPrivate={draft.isPrivate}
                 loading={publishing.loading || updating}
                 onContentChange={handleContentChange}
+                onPrivateChange={handlePrivateChange}
                 onPublish={() => void saveDocument()}
                 publishReady={Boolean(
                     activeDocument &&

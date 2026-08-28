@@ -22,6 +22,7 @@ export const ALL_ESSAYS_REFRESH_INTERVAL = 10 * MINUTE
 
 export interface EssayListEntry extends EssayListItem {
     localContent?: string
+    localIsPrivate?: boolean
     localThemeId?: number | null
     themeId: number | null
 }
@@ -60,9 +61,10 @@ function isCacheValid(
 }
 
 function remoteEntries(entries: EssayListEntry[]): EssayListItem[] {
-    return entries.map(({id, content, themeSlug}) => ({
+    return entries.map(({id, content, isPrivate, themeSlug}) => ({
         id,
         content,
+        isPrivate,
         themeSlug,
     }))
 }
@@ -145,25 +147,32 @@ export function useEssayLibraryController({
                 essays.map(async (essay): Promise<EssayListEntry> => {
                     const key = `essay:${essay.id}`
                     const draft = await draftRepository.load(key)
+                    const isPrivate = essay.isPrivate === true
                     const themeId = resolveThemeId(essay.themeSlug)
+                    const localIsPrivate = draft
+                        ? draft.isPrivate === true
+                        : isPrivate
                     const localThemeId = draft ? draft.themeId : themeId
                     if (
                         !draft ||
                         (draft.content === essay.content &&
+                            localIsPrivate === isPrivate &&
                             localThemeId === themeId)
                     ) {
                         if (
                             draft?.content === essay.content &&
+                            localIsPrivate === isPrivate &&
                             localThemeId === themeId
                         ) {
                             void draftRepository.clear(key).catch(() => undefined)
                         }
-                        return {...essay, themeId}
+                        return {...essay, isPrivate, themeId}
                     }
                     return {
                         ...essay,
                         themeId,
                         localContent: draft.content,
+                        localIsPrivate,
                         localThemeId,
                     }
                 })
@@ -492,6 +501,7 @@ export function useEssayLibraryController({
         (
             essayId: string,
             localContent: string,
+            localIsPrivate: boolean,
             localThemeId: number | null,
             modified: boolean
         ) => {
@@ -500,6 +510,9 @@ export function useEssayLibraryController({
                     ? {
                           ...entry,
                           localContent: modified ? localContent : undefined,
+                          localIsPrivate: modified
+                              ? localIsPrivate
+                              : undefined,
                           localThemeId: modified
                               ? localThemeId
                               : undefined,
@@ -515,19 +528,32 @@ export function useEssayLibraryController({
         (
             essayId: string,
             content: string,
+            isPrivate: boolean,
             themeId: number | null,
             themeSlug: string | null
         ) => {
             setCurrentEntries(
                 entriesRef.current.map((entry) =>
                     entry.id === essayId
-                        ? {id: entry.id, content, themeId, themeSlug}
+                        ? {
+                              id: entry.id,
+                              content,
+                              isPrivate,
+                              themeId,
+                              themeSlug,
+                          }
                         : entry
                 )
             )
             if (accessToken) {
                 void cacheRepository
-                    .updateEssay(accessToken, essayId, content, themeSlug)
+                    .updateEssay(
+                        accessToken,
+                        essayId,
+                        content,
+                        isPrivate,
+                        themeSlug
+                    )
                     .catch(() => undefined)
             }
         },
@@ -538,12 +564,13 @@ export function useEssayLibraryController({
         (
             essayId: string,
             content: string,
+            isPrivate: boolean,
             themeId: number | null,
             themeSlug: string | null
         ) => {
             if (!date) {
                 setCurrentEntries([
-                    {id: essayId, content, themeId, themeSlug},
+                    {id: essayId, content, isPrivate, themeId, themeSlug},
                     ...entriesRef.current.filter(
                         (entry) => entry.id !== essayId
                     ),
@@ -554,6 +581,7 @@ export function useEssayLibraryController({
                     .prependToAll(accessToken, {
                         id: essayId,
                         content,
+                        isPrivate,
                         themeSlug,
                     })
                     .catch(() => undefined)

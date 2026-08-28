@@ -33,7 +33,12 @@ describe('EssayLibraryClient', () => {
                 userId: 'user id',
             })
         ).resolves.toEqual([
-            {id: '7', content: '# Hello', themeSlug: 'technology'},
+            {
+                id: '7',
+                content: '# Hello',
+                isPrivate: false,
+                themeSlug: 'technology',
+            },
         ])
         expect(httpClient).toHaveBeenCalledWith(
             'https://api.essay.ink/essays?page=2&uid=user+id&date=2026-08-27',
@@ -59,7 +64,12 @@ describe('EssayLibraryClient', () => {
                 userId: 'user',
             })
         ).resolves.toEqual([
-            {id: 'legacy', content: 'Old essay', themeSlug: null},
+            {
+                id: 'legacy',
+                content: 'Old essay',
+                isPrivate: false,
+                themeSlug: null,
+            },
         ])
     })
 
@@ -79,7 +89,33 @@ describe('EssayLibraryClient', () => {
                 userId: 'user',
             })
         ).resolves.toEqual([
-            {id: 'essay', content: 'Themed', themeSlug: 'technology'},
+            {
+                id: 'essay',
+                content: 'Themed',
+                isPrivate: false,
+                themeSlug: 'technology',
+            },
+        ])
+    })
+
+    it('reads is_private from the essay response', async () => {
+        const client = createEssayLibraryClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient: async () =>
+                response(
+                    '[{"id":"private","content":"Hidden","is_private":true}]'
+                ),
+        })
+
+        await expect(
+            client.list({accessToken: 'token', page: 1, userId: 'user'})
+        ).resolves.toEqual([
+            {
+                id: 'private',
+                content: 'Hidden',
+                isPrivate: true,
+                themeSlug: null,
+            },
         ])
     })
 
@@ -92,12 +128,16 @@ describe('EssayLibraryClient', () => {
             httpClient,
         })
 
-        await client.update('essay/id', 'updated', null, 'token')
+        await client.update('essay/id', 'updated', null, true, 'token')
         expect(httpClient).toHaveBeenCalledWith(
             'https://api.essay.ink/essays/essay%2Fid',
             expect.objectContaining({
                 method: 'PUT',
-                body: JSON.stringify({content: 'updated', theme_id: null}),
+                body: JSON.stringify({
+                    content: 'updated',
+                    theme_id: null,
+                    is_private: true,
+                }),
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer token',

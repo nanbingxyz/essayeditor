@@ -205,6 +205,12 @@
     font-size: 12px;
 }
 
+.editor-publish-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .publish-button {
     width: 38px;
     height: 38px;

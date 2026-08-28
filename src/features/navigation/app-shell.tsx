@@ -3,7 +3,6 @@ import {
     PanelLeftExpand20Regular,
     PanelRightContract20Regular,
     PanelRightExpand20Regular,
-    bundleIcon,
 } from '@fluentui/react-icons'
 import {GearIcon} from '@radix-ui/react-icons'
 import {type CSSProperties, type ReactNode, useState} from 'react'

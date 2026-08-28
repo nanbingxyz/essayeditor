@@ -25,6 +25,7 @@ function createStore(initialValues: Record<string, unknown> = {}) {
 const storedDraft: DraftSnapshot = {
     version: 2,
     content: 'stored content',
+    isPrivate: false,
     themeId: 3,
     updatedAt: 123,
 }

@@ -1,7 +1,9 @@
 interface PublishedDocumentStatusOptions {
     baselineContent: string
+    baselineIsPrivate?: boolean
     baselineThemeId: number | null
     currentContent: string
+    currentIsPrivate?: boolean
     currentThemeId: number | null
     draftReady: boolean
     hasKnownLocalChanges: boolean
@@ -9,8 +11,10 @@ interface PublishedDocumentStatusOptions {
 
 export function getPublishedDocumentStatus({
     baselineContent,
+    baselineIsPrivate = false,
     baselineThemeId,
     currentContent,
+    currentIsPrivate = false,
     currentThemeId,
     draftReady,
     hasKnownLocalChanges,
@@ -20,6 +24,7 @@ export function getPublishedDocumentStatus({
     }
 
     return currentContent === baselineContent &&
+        currentIsPrivate === baselineIsPrivate &&
         currentThemeId === baselineThemeId
         ? 'published'
         : 'modified'

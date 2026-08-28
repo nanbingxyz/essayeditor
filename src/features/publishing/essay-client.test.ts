@@ -14,14 +14,20 @@ describe('EssayClient', () => {
             httpClient,
         })
 
-        await expect(client.publish('content', 8, 'token')).resolves.toEqual({
+        await expect(
+            client.publish('content', 8, true, 'token')
+        ).resolves.toEqual({
             id: 'essay-id',
         })
         expect(httpClient).toHaveBeenCalledWith(
             'https://api.essay.ink/essays',
             expect.objectContaining({
                 method: 'POST',
-                body: JSON.stringify({content: 'content', theme_id: 8}),
+                body: JSON.stringify({
+                    content: 'content',
+                    theme_id: 8,
+                    is_private: true,
+                }),
                 headers: expect.objectContaining({
                     Authorization: 'Bearer token',
                 }),
@@ -36,9 +42,9 @@ describe('EssayClient', () => {
                 response('{"error":"invalid token"}', 401),
         })
 
-        await expect(client.publish('content', null, 'token')).rejects.toThrow(
-            'invalid token'
-        )
+        await expect(
+            client.publish('content', null, false, 'token')
+        ).rejects.toThrow('invalid token')
     })
 
     it('normalizes network, non-JSON, and invalid success responses', async () => {
@@ -57,13 +63,13 @@ describe('EssayClient', () => {
             httpClient: async () => response('{"id":""}'),
         })
 
-        await expect(networkClient.publish('', null, '')).rejects.toEqual(
+        await expect(networkClient.publish('', null, false, '')).rejects.toEqual(
             expect.any(EssayPublishError)
         )
-        await expect(invalidErrorClient.publish('', null, '')).rejects.toThrow(
+        await expect(invalidErrorClient.publish('', null, false, '')).rejects.toThrow(
             '请检查网络或 API Key 是否正确'
         )
-        await expect(invalidSuccessClient.publish('', null, '')).rejects.toThrow(
+        await expect(invalidSuccessClient.publish('', null, false, '')).rejects.toThrow(
             '服务器返回了无效的文章信息'
         )
     })

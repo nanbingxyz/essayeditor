@@ -11,6 +11,7 @@ const LOCAL_DRAFT_COLLECTION_KEY = 'localDrafts'
 export interface DraftSnapshot {
     version: 2
     content: string
+    isPrivate?: boolean
     themeId: number | null
     updatedAt: number
 }
@@ -19,6 +20,7 @@ export interface LocalDraft {
     localId: string
     content: string
     createdAt: number
+    isPrivate?: boolean
     themeId: number | null
     updatedAt: number
 }
@@ -82,6 +84,10 @@ function parseLocalDraft(value: unknown): LocalDraft | null {
         typeof candidate.localId !== 'string' ||
         !candidate.localId ||
         typeof candidate.content !== 'string' ||
+        !(
+            candidate.isPrivate === undefined ||
+            typeof candidate.isPrivate === 'boolean'
+        ) ||
         !isFiniteTimestamp(candidate.createdAt) ||
         !isFiniteTimestamp(candidate.updatedAt) ||
         themeId === undefined
@@ -93,6 +99,7 @@ function parseLocalDraft(value: unknown): LocalDraft | null {
         localId: candidate.localId,
         content: candidate.content,
         createdAt: candidate.createdAt,
+        isPrivate: candidate.isPrivate === true,
         themeId,
         updatedAt: candidate.updatedAt,
     }
@@ -143,6 +150,10 @@ export function parseDraftSnapshot(value: unknown): DraftSnapshot | null {
     if (
         candidate.version !== 2 ||
         typeof candidate.content !== 'string' ||
+        !(
+            candidate.isPrivate === undefined ||
+            typeof candidate.isPrivate === 'boolean'
+        ) ||
         !isFiniteTimestamp(candidate.updatedAt) ||
         themeId === undefined
     ) {
@@ -152,6 +163,7 @@ export function parseDraftSnapshot(value: unknown): DraftSnapshot | null {
     return {
         version: 2,
         content: candidate.content,
+        isPrivate: candidate.isPrivate === true,
         themeId,
         updatedAt: candidate.updatedAt,
     }
@@ -267,6 +279,7 @@ export function createDraftRepository({
                     localId: createId(),
                     content,
                     createdAt: timestamp,
+                    isPrivate: false,
                     themeId: null,
                     updatedAt: timestamp,
                 }
@@ -288,6 +301,7 @@ export function createDraftRepository({
                     localId: createId(),
                     content: '',
                     createdAt: timestamp,
+                    isPrivate: false,
                     themeId: null,
                     updatedAt: timestamp,
                 }
@@ -312,6 +326,7 @@ export function createDraftRepository({
                     ? {
                           version: 2,
                           content: draft.content,
+                          isPrivate: draft.isPrivate,
                           themeId: draft.themeId,
                           updatedAt: draft.updatedAt,
                       }
@@ -337,6 +352,7 @@ export function createDraftRepository({
                         localId,
                         content: snapshot.content,
                         createdAt: existing?.createdAt ?? snapshot.updatedAt,
+                        isPrivate: snapshot.isPrivate,
                         themeId: snapshot.themeId,
                         updatedAt: snapshot.updatedAt,
                     }
