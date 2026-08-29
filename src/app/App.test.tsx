@@ -5,8 +5,9 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 
 import {Toaster} from '@/shared/ui'
 
-const {httpFetch, storeFiles} = vi.hoisted(() => ({
+const {httpFetch, openExternal, storeFiles} = vi.hoisted(() => ({
     httpFetch: vi.fn(),
+    openExternal: vi.fn(async () => undefined),
     storeFiles: new Map<string, Map<string, unknown>>(),
 }))
 
@@ -22,7 +23,7 @@ vi.mock('@tauri-apps/api/window', () => ({
 }))
 
 vi.mock('@tauri-apps/plugin-shell', () => ({
-    open: vi.fn(async () => undefined),
+    open: openExternal,
 }))
 
 vi.mock('@tauri-apps/plugin-http', () => ({
@@ -64,6 +65,7 @@ afterEach(() => {
     roots.splice(0).forEach((root) => act(() => root.unmount()))
     document.body.replaceChildren()
     httpFetch.mockReset()
+    openExternal.mockClear()
     storeFiles.clear()
 })
 
@@ -132,6 +134,9 @@ describe('App navigation', () => {
             'button[aria-label="发布文章"]'
         ) as HTMLButtonElement
         expect(publishButton.disabled).toBe(false)
+        expect(
+            container.querySelector('button[aria-label="打开已发布文章"]')
+        ).toBeNull()
         act(() => publishButton.click())
         expect(container.querySelector('.settings-page-container')?.className)
             .not.toContain('is-page-hidden')
@@ -297,6 +302,21 @@ describe('App navigation', () => {
         expect(
             container.querySelector('[data-document-id="essay:real-id"]')
         ).not.toBeNull()
+        const openButton = container.querySelector(
+            'button[aria-label="打开已发布文章"]'
+        ) as HTMLButtonElement
+        expect(openButton.title).toBe('打开')
+        expect(
+            openButton.compareDocumentPosition(
+                container.querySelector(
+                    'button[aria-label="选择频道"]'
+                ) as HTMLButtonElement
+            ) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).not.toBe(0)
+        act(() => openButton.click())
+        expect(openExternal).toHaveBeenCalledWith(
+            'https://www.essay.ink/essays/real-id'
+        )
         expect(container.textContent).toContain('Publish me')
         expect(
             (

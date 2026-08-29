@@ -169,6 +169,14 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     margin-left: 0;
 }
 
+.editor-open-button {
+    color: hsl(var(--muted-foreground));
+}
+
+.editor-open-button:hover {
+    color: hsl(var(--foreground));
+}
+
 .editor-delete-button {
     color: hsl(var(--muted-foreground));
 }

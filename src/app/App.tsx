@@ -3,6 +3,7 @@ import '@fontsource/barlow/latin-500.css'
 import '@fontsource/barlow/latin-600.css'
 import '@fontsource/barlow/latin-700.css'
 import '@fontsource-variable/noto-serif-sc'
+import {Open16Regular} from '@fluentui/react-icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
@@ -52,7 +53,7 @@ import {
     useThemeController,
 } from '@/features/themes'
 import { tauriDesktopAdapter } from '@/shared/platform/desktop'
-import { ToastAction, useToast } from '@/shared/ui'
+import {ToastAction, useToast} from '@/shared/ui'
 
 import { essayApiBaseUrl } from './essay-api-config'
 import { getPublishedDocumentStatus } from './document-status'
@@ -874,6 +875,21 @@ export default function App() {
             editorStatusLabel={editorStatusLabel}
             editorToolbarActions={
                 <>
+                    {activeDocument?.kind === 'published' && (
+                        <button
+                            type="button"
+                            className="editor-open-button"
+                            aria-label="打开已发布文章"
+                            title="打开"
+                            onClick={() =>
+                                void tauriDesktopAdapter.openExternal(
+                                    `https://www.essay.ink/essays/${activeDocument.id}`
+                                )
+                            }
+                        >
+                            <Open16Regular aria-hidden="true" />
+                        </button>
+                    )}
                     <ThemeSelector
                         disabled={Boolean(
                             !activeDocument ||
