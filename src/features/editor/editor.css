@@ -240,3 +240,136 @@
         background-position: -200% 0;
     }
 }
+
+.pdf-export-document {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 658px;
+    box-sizing: border-box;
+    color: #242424;
+    background: #ffffff;
+    font-family: 'Noto Serif SC Variable', 'Noto Serif SC', serif;
+    font-size: 15px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.pdf-export-document > :first-child {
+    margin-top: 0;
+}
+
+.pdf-export-document > :last-child {
+    margin-bottom: 0;
+}
+
+.pdf-export-document h1,
+.pdf-export-document h2,
+.pdf-export-document h3,
+.pdf-export-document h4,
+.pdf-export-document h5,
+.pdf-export-document h6 {
+    margin: 1.25em 0 0.55em;
+    break-after: avoid-page;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.pdf-export-document h1 {
+    font-size: 2em;
+}
+
+.pdf-export-document h2 {
+    padding-bottom: 0.2em;
+    border-bottom: 1px solid #dddddd;
+    font-size: 1.5em;
+}
+
+.pdf-export-document h3 {
+    font-size: 1.25em;
+}
+
+.pdf-export-document p,
+.pdf-export-document ul,
+.pdf-export-document ol,
+.pdf-export-document blockquote,
+.pdf-export-document pre,
+.pdf-export-document table {
+    margin: 0 0 0.9em;
+}
+
+.pdf-export-document ul,
+.pdf-export-document ol {
+    padding-left: 1.6em;
+}
+
+.pdf-export-document blockquote {
+    padding: 0.1em 0 0.1em 1em;
+    border-left: 3px solid #b8b8b8;
+    break-inside: avoid;
+    color: #5f5f5f;
+}
+
+.pdf-export-document a {
+    color: #242424;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.pdf-export-document code {
+    padding: 0.12em 0.32em;
+    border-radius: 4px;
+    background: #f0f0f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88em;
+}
+
+.pdf-export-document pre {
+    padding: 12px 14px;
+    border-radius: 6px;
+    break-inside: avoid;
+    background: #f3f3f3;
+    white-space: pre-wrap;
+}
+
+.pdf-export-document pre code {
+    padding: 0;
+    background: transparent;
+}
+
+.pdf-export-document img {
+    display: block;
+    max-width: 100%;
+    max-height: 700px;
+    margin: 1em auto;
+    break-inside: avoid;
+    object-fit: contain;
+}
+
+.pdf-export-document table {
+    width: 100%;
+    border-collapse: collapse;
+    break-inside: avoid;
+    font-size: 0.92em;
+}
+
+.pdf-export-document th,
+.pdf-export-document td {
+    padding: 6px 8px;
+    border: 1px solid #cfcfcf;
+    text-align: left;
+    vertical-align: top;
+}
+
+.pdf-export-document th {
+    background: #f1f1f1;
+    font-weight: 600;
+}
+
+.pdf-export-document hr {
+    margin: 1.5em 0;
+    border: 0;
+    border-top: 1px solid #cfcfcf;
+}

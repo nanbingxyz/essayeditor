@@ -65,14 +65,48 @@ async fn export_markdown(
     content: String,
     default_file_name: String,
 ) -> Result<bool, String> {
+    save_export_file(
+        &app,
+        content.into_bytes(),
+        default_file_name,
+        "导出 Markdown 文件",
+        "Markdown",
+        "md",
+    )
+}
+
+#[tauri::command]
+async fn export_pdf(
+    app: tauri::AppHandle,
+    content: Vec<u8>,
+    default_file_name: String,
+) -> Result<bool, String> {
+    save_export_file(
+        &app,
+        content,
+        default_file_name,
+        "导出 PDF 文件",
+        "PDF",
+        "pdf",
+    )
+}
+
+fn save_export_file(
+    app: &tauri::AppHandle,
+    content: Vec<u8>,
+    default_file_name: String,
+    title: &str,
+    filter_name: &str,
+    extension: &str,
+) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
 
     let Some(file_path) = app
         .dialog()
         .file()
-        .set_title("导出 Markdown 文件")
+        .set_title(title)
         .set_file_name(default_file_name)
-        .add_filter("Markdown", &["md"])
+        .add_filter(filter_name, &[extension])
         .blocking_save_file()
     else {
         return Ok(false);
@@ -95,6 +129,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             export_markdown,
+            export_pdf,
             set_macos_window_appearance
         ])
         .run(tauri::generate_context!())

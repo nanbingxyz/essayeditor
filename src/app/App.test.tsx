@@ -5,11 +5,24 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 
 import {Toaster} from '@/shared/ui'
 
-const {httpFetch, invokeNative, openExternal, storeFiles} = vi.hoisted(() => ({
+const {
+    createPdfBytes,
+    httpFetch,
+    invokeNative,
+    openExternal,
+    storeFiles,
+} = vi.hoisted(() => ({
+    createPdfBytes: vi.fn(async () =>
+        Uint8Array.from([37, 80, 68, 70])
+    ),
     httpFetch: vi.fn(),
     invokeNative: vi.fn(async () => undefined),
     openExternal: vi.fn(async () => undefined),
     storeFiles: new Map<string, Map<string, unknown>>(),
+}))
+
+vi.mock('@/features/editor/markdown-pdf', () => ({
+    createMarkdownPdf: createPdfBytes,
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -66,6 +79,7 @@ afterEach(() => {
     roots.splice(0).forEach((root) => act(() => root.unmount()))
     document.body.replaceChildren()
     httpFetch.mockReset()
+    createPdfBytes.mockClear()
     invokeNative.mockClear()
     openExternal.mockClear()
     storeFiles.clear()
@@ -334,6 +348,16 @@ describe('App navigation', () => {
         expect(invokeNative).toHaveBeenCalledWith('export_markdown', {
             content: 'Publish me',
             defaultFileName: 'essay_real-id.md',
+        })
+        act(() => exportButton.click())
+        await act(async () => {
+            buttonWithText('导出为 PDF 文件')?.click()
+            await settle()
+        })
+        expect(createPdfBytes).toHaveBeenCalledWith('Publish me')
+        expect(invokeNative).toHaveBeenCalledWith('export_pdf', {
+            content: [37, 80, 68, 70],
+            defaultFileName: 'essay_real-id.pdf',
         })
         expect(container.textContent).toContain('Publish me')
         expect(

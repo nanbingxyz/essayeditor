@@ -63,4 +63,19 @@ describe('tauriDesktopAdapter', () => {
             defaultFileName: 'essay_42.md',
         })
     })
+
+    it('exports PDF bytes with the requested default file name', async () => {
+        vi.mocked(invoke).mockResolvedValueOnce(true)
+
+        const exported = await tauriDesktopAdapter.exportPdf(
+            new Uint8Array([37, 80, 68, 70]),
+            'essay_42.pdf'
+        )
+
+        expect(exported).toBe(true)
+        expect(invoke).toHaveBeenCalledWith('export_pdf', {
+            content: [37, 80, 68, 70],
+            defaultFileName: 'essay_42.pdf',
+        })
+    })
 })

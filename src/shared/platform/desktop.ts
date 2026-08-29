@@ -9,6 +9,10 @@ export interface DesktopAdapter {
         content: string,
         defaultFileName: string
     ) => Promise<boolean>
+    exportPdf: (
+        content: Uint8Array,
+        defaultFileName: string
+    ) => Promise<boolean>
     openExternal: (url: string) => Promise<void>
     setWindowAppearance: (appearance: WindowAppearance) => Promise<void>
     showMainWindow: () => Promise<void>
@@ -17,6 +21,11 @@ export interface DesktopAdapter {
 export const tauriDesktopAdapter: DesktopAdapter = {
     exportMarkdown: (content, defaultFileName) =>
         invoke<boolean>('export_markdown', {content, defaultFileName}),
+    exportPdf: (content, defaultFileName) =>
+        invoke<boolean>('export_pdf', {
+            content: Array.from(content),
+            defaultFileName,
+        }),
     openExternal: open,
     setWindowAppearance: async (appearance) => {
         await invoke('set_macos_window_appearance', {appearance})

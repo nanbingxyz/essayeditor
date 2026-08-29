@@ -11,6 +11,7 @@ import {
 } from '@/features/activity'
 import {
     createDraftRepository,
+    createMarkdownPdf,
     DeleteDocumentButton,
     EditorPage,
     ExportMenu,
@@ -108,6 +109,10 @@ function getMarkdownExportFileName(document: ActiveDocument) {
     return `essay_${safeId}.md`
 }
 
+function getPdfExportFileName(document: ActiveDocument) {
+    return getMarkdownExportFileName(document).replace(/\.md$/, '.pdf')
+}
+
 export default function App() {
     const { toast } = useToast()
     const [page, setPage] = useState<AppPage>('editor')
@@ -117,6 +122,7 @@ export default function App() {
     const [localDrafts, setLocalDrafts] = useState<LocalDraft[]>([])
     const [localDraftsReady, setLocalDraftsReady] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const [exportingPdf, setExportingPdf] = useState(false)
     const [updating, setUpdating] = useState(false)
     const editorRef = useRef<MarkdownEditorHandle>(null)
     const localDraftsRef = useRef<LocalDraft[]>([])
@@ -768,6 +774,36 @@ export default function App() {
         }
     }
 
+    const exportPdf = async () => {
+        if (!activeDocument || !draft.ready || exportingPdf) {
+            return
+        }
+
+        const content = editorRef.current?.getValue() ?? draft.content
+        setExportingPdf(true)
+        try {
+            const pdf = await createMarkdownPdf(content)
+            const exported = await tauriDesktopAdapter.exportPdf(
+                pdf,
+                getPdfExportFileName(activeDocument)
+            )
+            if (exported) {
+                toast({title: 'PDF 文件已导出'})
+            }
+        } catch (error) {
+            toast({
+                title: '导出失败',
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : '请稍后重试',
+                variant: 'destructive',
+            })
+        } finally {
+            setExportingPdf(false)
+        }
+    }
+
     const handleContentChange = (content: string) => {
         if (!activeDocument) {
             return
@@ -914,9 +950,11 @@ export default function App() {
                             !localDraftsReady ||
                             publishing.loading ||
                             updating ||
-                            deleting
+                            deleting ||
+                            exportingPdf
                         )}
                         onExportMarkdown={exportMarkdown}
+                        onExportPdf={exportPdf}
                     />
                     {activeDocument?.kind === 'published' && (
                         <button

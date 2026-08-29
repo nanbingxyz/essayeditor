@@ -1,14 +1,20 @@
-import {ArrowCircleDownRight20Regular, Markdown20Regular} from '@fluentui/react-icons'
+import {
+    ArrowCircleDownRight20Regular,
+    DocumentPdf20Regular,
+    Markdown20Regular,
+} from '@fluentui/react-icons'
 import {useEffect, useRef, useState} from 'react'
 
 interface ExportMenuProps {
     disabled: boolean
     onExportMarkdown: () => void | Promise<void>
+    onExportPdf: () => void | Promise<void>
 }
 
 export default function ExportMenu({
     disabled,
     onExportMarkdown,
+    onExportPdf,
 }: ExportMenuProps) {
     const [open, setOpen] = useState(false)
     const rootRef = useRef<HTMLDivElement>(null)
@@ -42,6 +48,11 @@ export default function ExportMenu({
         void onExportMarkdown()
     }
 
+    const exportPdf = () => {
+        setOpen(false)
+        void onExportPdf()
+    }
+
     return (
         <div ref={rootRef} className="export-menu">
             <button
@@ -71,6 +82,15 @@ export default function ExportMenu({
                     >
                         <Markdown20Regular aria-hidden="true" />
                         导出为 Markdown 文件
+                    </button>
+                    <button
+                        type="button"
+                        className="export-menu-item flex justify-start gap-2"
+                        role="menuitem"
+                        onClick={exportPdf}
+                    >
+                        <DocumentPdf20Regular aria-hidden="true" />
+                        导出为 PDF 文件
                     </button>
                 </div>
             )}
