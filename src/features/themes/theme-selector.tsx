@@ -1,4 +1,4 @@
-import {CommunicationRegular} from '@fluentui/react-icons'
+import {Communication20Regular} from '@fluentui/react-icons'
 import {CheckIcon, ChevronDownIcon, Cross2Icon} from '@radix-ui/react-icons'
 import {useEffect, useRef, useState} from 'react'
 
@@ -88,7 +88,7 @@ export default function ThemeSelector({
                 disabled={disabled || !ready}
                 onClick={toggle}
             >
-                <CommunicationRegular aria-hidden="true" />
+                <Communication20Regular aria-hidden="true" />
                 {selectedLabel && (
                     <span className="theme-selector-label">
                         {selectedLabel}

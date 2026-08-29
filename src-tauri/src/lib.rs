@@ -59,16 +59,44 @@ fn set_macos_window_appearance(
     Ok(())
 }
 
+#[tauri::command]
+async fn export_markdown(
+    app: tauri::AppHandle,
+    content: String,
+    default_file_name: String,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let Some(file_path) = app
+        .dialog()
+        .file()
+        .set_title("导出 Markdown 文件")
+        .set_file_name(default_file_name)
+        .add_filter("Markdown", &["md"])
+        .blocking_save_file()
+    else {
+        return Ok(false);
+    };
+    let path = file_path.into_path().map_err(|error| error.to_string())?;
+    std::fs::write(path, content).map_err(|error| error.to_string())?;
+
+    Ok(true)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![set_macos_window_appearance])
+        .invoke_handler(tauri::generate_handler![
+            export_markdown,
+            set_macos_window_appearance
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,4 +1,4 @@
-import {Delete16Regular} from '@fluentui/react-icons'
+import {Delete20Regular} from '@fluentui/react-icons'
 import {ShadowInnerIcon} from '@radix-ui/react-icons'
 import {useState} from 'react'
 
@@ -47,7 +47,7 @@ export default function DeleteDocumentButton({
                 disabled={disabled || deleting}
                 onClick={() => setOpen(true)}
             >
-                <Delete16Regular />
+                <Delete20Regular />
             </button>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>

@@ -1,9 +1,8 @@
-import '@fontsource/barlow/latin-400.css'
+import {Open20Regular} from '@fluentui/react-icons'
 import '@fontsource/barlow/latin-500.css'
 import '@fontsource/barlow/latin-600.css'
 import '@fontsource/barlow/latin-700.css'
 import '@fontsource-variable/noto-serif-sc'
-import {Open16Regular} from '@fluentui/react-icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
@@ -14,6 +13,7 @@ import {
     createDraftRepository,
     DeleteDocumentButton,
     EditorPage,
+    ExportMenu,
     getLocalDraftDocumentKey,
     type LocalDraft,
     type MarkdownEditorHandle,
@@ -100,6 +100,12 @@ function createRecoveryDraft(): LocalDraft {
         themeId: null,
         updatedAt: timestamp,
     }
+}
+
+function getMarkdownExportFileName(document: ActiveDocument) {
+    const id = document.kind === 'published' ? document.id : document.localId
+    const safeId = id.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+    return `essay_${safeId}.md`
 }
 
 export default function App() {
@@ -736,6 +742,32 @@ export default function App() {
         setSelectedDate(date)
     }
 
+    const exportMarkdown = async () => {
+        if (!activeDocument || !draft.ready) {
+            return
+        }
+
+        const content = editorRef.current?.getValue() ?? draft.content
+        try {
+            const exported = await tauriDesktopAdapter.exportMarkdown(
+                content,
+                getMarkdownExportFileName(activeDocument)
+            )
+            if (exported) {
+                toast({title: 'Markdown 文件已导出'})
+            }
+        } catch (error) {
+            toast({
+                title: '导出失败',
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : '请稍后重试',
+                variant: 'destructive',
+            })
+        }
+    }
+
     const handleContentChange = (content: string) => {
         if (!activeDocument) {
             return
@@ -875,6 +907,17 @@ export default function App() {
             editorStatusLabel={editorStatusLabel}
             editorToolbarActions={
                 <>
+                    <ExportMenu
+                        disabled={Boolean(
+                            !activeDocument ||
+                            !draft.ready ||
+                            !localDraftsReady ||
+                            publishing.loading ||
+                            updating ||
+                            deleting
+                        )}
+                        onExportMarkdown={exportMarkdown}
+                    />
                     {activeDocument?.kind === 'published' && (
                         <button
                             type="button"
@@ -887,7 +930,7 @@ export default function App() {
                                 )
                             }
                         >
-                            <Open16Regular aria-hidden="true" />
+                            <Open20Regular aria-hidden="true" />
                         </button>
                     )}
                     <ThemeSelector

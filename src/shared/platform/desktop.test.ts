@@ -48,4 +48,19 @@ describe('tauriDesktopAdapter', () => {
         )
         expect(setTheme).toHaveBeenCalledWith(null)
     })
+
+    it('exports Markdown with the requested default file name', async () => {
+        vi.mocked(invoke).mockResolvedValueOnce(true)
+
+        const exported = await tauriDesktopAdapter.exportMarkdown(
+            '# Essay',
+            'essay_42.md'
+        )
+
+        expect(exported).toBe(true)
+        expect(invoke).toHaveBeenCalledWith('export_markdown', {
+            content: '# Essay',
+            defaultFileName: 'essay_42.md',
+        })
+    })
 })

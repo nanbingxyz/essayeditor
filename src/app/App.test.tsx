@@ -5,14 +5,15 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 
 import {Toaster} from '@/shared/ui'
 
-const {httpFetch, openExternal, storeFiles} = vi.hoisted(() => ({
+const {httpFetch, invokeNative, openExternal, storeFiles} = vi.hoisted(() => ({
     httpFetch: vi.fn(),
+    invokeNative: vi.fn(async () => undefined),
     openExternal: vi.fn(async () => undefined),
     storeFiles: new Map<string, Map<string, unknown>>(),
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
-    invoke: vi.fn(async () => undefined),
+    invoke: invokeNative,
 }))
 
 vi.mock('@tauri-apps/api/window', () => ({
@@ -65,6 +66,7 @@ afterEach(() => {
     roots.splice(0).forEach((root) => act(() => root.unmount()))
     document.body.replaceChildren()
     httpFetch.mockReset()
+    invokeNative.mockClear()
     openExternal.mockClear()
     storeFiles.clear()
 })
@@ -305,7 +307,14 @@ describe('App navigation', () => {
         const openButton = container.querySelector(
             'button[aria-label="打开已发布文章"]'
         ) as HTMLButtonElement
+        const exportButton = container.querySelector(
+            'button[aria-label="导出"]'
+        ) as HTMLButtonElement
         expect(openButton.title).toBe('打开')
+        expect(
+            exportButton.compareDocumentPosition(openButton) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).not.toBe(0)
         expect(
             openButton.compareDocumentPosition(
                 container.querySelector(
@@ -317,6 +326,15 @@ describe('App navigation', () => {
         expect(openExternal).toHaveBeenCalledWith(
             'https://www.essay.ink/essays/real-id'
         )
+        act(() => exportButton.click())
+        await act(async () => {
+            buttonWithText('导出为 Markdown 文件')?.click()
+            await settle()
+        })
+        expect(invokeNative).toHaveBeenCalledWith('export_markdown', {
+            content: 'Publish me',
+            defaultFileName: 'essay_real-id.md',
+        })
         expect(container.textContent).toContain('Publish me')
         expect(
             (

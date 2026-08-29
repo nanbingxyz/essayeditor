@@ -70,6 +70,57 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     gap: 12px;
 }
 
+.export-menu {
+    position: relative;
+}
+
+.export-menu-trigger {
+    color: hsl(var(--muted-foreground));
+}
+
+.export-menu-trigger:not(:disabled):hover,
+.export-menu-trigger[aria-expanded='true'] {
+    color: hsl(var(--foreground));
+}
+
+.export-menu-trigger:disabled {
+    opacity: 0.5;
+}
+
+.export-menu-content {
+    position: absolute;
+    z-index: 80;
+    top: calc(100% + 6px);
+    right: 0;
+    width: max-content;
+    min-width: 190px;
+    padding: 5px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    color: hsl(var(--popover-foreground));
+    background: hsl(var(--popover));
+    box-shadow: 0 10px 30px hsl(0 0% 0% / 0.18);
+}
+
+.export-menu-item {
+    display: flex;
+    width: 100%;
+    min-height: 34px;
+    align-items: center;
+    padding: 7px 9px;
+    border-radius: 5px;
+    color: inherit;
+    background: transparent;
+    font-size: 13px;
+    text-align: left;
+}
+
+.export-menu-item:hover,
+.export-menu-item:focus-visible {
+    outline: 0;
+    background: hsl(var(--accent));
+}
+
 .theme-selector {
     position: relative;
 }
