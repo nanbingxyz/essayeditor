@@ -14,7 +14,6 @@ import {
     ShadowInnerIcon,
 } from '@radix-ui/react-icons'
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-
 import {
     MarkdownEditor,
     type MarkdownEditorHandle,
@@ -712,12 +711,13 @@ export default function NoteSidebar({
                             {hasActiveQuery ? (
                                 <span>未找到匹配的笔记</span>
                             ) : (
-                                <>
-                                    <span>还没有笔记</span>
-                                    <button type="button" onClick={beginCreate}>
+                                <div className='flex flex-col gap-2 mt-32 px-6'>
+                                    <img src="/public/notfound.png" alt="No notes" className='w-24 opacity-75 mx-auto dark:invert' />
+                                    <p className='text-muted-foreground text-xs'>然而要有茂林嘉卉，却非先有这萌芽不可。</p>
+                                    <Button type="button" size="sm" onClick={beginCreate} className="rounded-full mt-4">
                                         添加第一条笔记
-                                    </button>
-                                </>
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     ) : (
