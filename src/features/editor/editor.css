@@ -34,6 +34,10 @@
     background: transparent;
 }
 
+.markdown-editor .cm-content * {
+    font-family: inherit;
+}
+
 .markdown-editor .cm-editor.cm-focused {
     outline: 0;
 }

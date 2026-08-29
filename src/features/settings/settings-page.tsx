@@ -1,4 +1,5 @@
-import {ArrowLeftIcon, EyeClosedIcon, EyeOpenIcon} from '@radix-ui/react-icons'
+import {ArrowLeftIcon, EyeClosedIcon, EyeOpenIcon, MoonIcon, SunIcon,} from '@radix-ui/react-icons'
+import {DarkThemeRegular} from '@fluentui/react-icons'
 import {useState} from 'react'
 
 import {cn} from '@/shared/lib'
@@ -121,11 +122,11 @@ export default function SettingsPage({
                 >
                     {(
                         [
-                            ['light', '浅色', '始终使用浅色外观'],
-                            ['dark', '暗色', '始终使用暗色外观'],
-                            ['system', '跟随系统', '根据系统设置自动切换'],
+                            ['light', '浅色', '始终使用浅色外观', <SunIcon/>],
+                            ['dark', '暗色', '始终使用暗色外观', <MoonIcon/>],
+                            ['system', '跟随系统', '根据系统设置自动切换', <DarkThemeRegular/>],
                         ] as const
-                    ).map(([option, label, description]) => (
+                    ).map(([option, label, description, icon]) => (
                         <label
                             key={option}
                             className={cn(
@@ -142,6 +143,7 @@ export default function SettingsPage({
                                 onChange={() => onAppearanceChange(option)}
                             />
                             <span className="appearance-option-copy">
+                                {icon && <span className="appearance-option-icon">{icon}</span>}
                                 <span>{label}</span>
                                 <small>{description}</small>
                             </span>

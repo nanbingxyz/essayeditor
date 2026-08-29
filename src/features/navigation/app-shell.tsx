@@ -57,7 +57,7 @@ function SidebarUser({user}: {user: SidebarAccountUser}) {
                 {user.avatar ? <AvatarImage src={user.avatar} alt="" /> : null}
                 <AvatarFallback>{fallbackLabel}</AvatarFallback>
             </Avatar>
-            <span className="sidebar-user-name">{user.displayName}</span>
+            <span className="sidebar-user-name font-medium opacity-80">{user.displayName}</span>
         </div>
     )
 }

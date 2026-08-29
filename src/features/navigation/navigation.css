@@ -630,8 +630,7 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     align-items: center;
     gap: 10px;
     padding: 0 4px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 13px;
 }
 
 .sidebar-user-avatar {
