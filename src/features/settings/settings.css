@@ -64,6 +64,47 @@
     margin-top: 38px;
 }
 
+.update-section {
+    margin-top: 38px;
+}
+
+.current-app-version {
+    font-variant-numeric: tabular-nums;
+}
+
+.update-action-row {
+    display: flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 10px;
+}
+
+.update-action-row small,
+.update-progress small {
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.update-action-row small.is-error {
+    color: hsl(var(--destructive));
+}
+
+.update-progress {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: min(100%, 420px);
+    margin-top: 14px;
+}
+
+.update-progress small {
+    min-width: 42px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 .appearance-options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -186,5 +227,10 @@
 
     .appearance-option {
         min-height: 0;
+    }
+
+    .update-action-row {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }

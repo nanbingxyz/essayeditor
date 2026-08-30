@@ -2,6 +2,8 @@ import {createRoot, Root} from 'react-dom/client'
 import {act} from 'react-dom/test-utils'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 
+import {UpdaterProvider, type UpdaterService} from '@/features/updater'
+
 import SettingsPage from './settings-page'
 
 const roots: Root[] = []
@@ -12,19 +14,26 @@ function renderSettings(disabled = false) {
     const root = createRoot(container)
     roots.push(root)
     const onAppearanceChange = vi.fn()
+    const updaterService: UpdaterService = {
+        check: vi.fn(async () => null),
+        getVersion: vi.fn(() => new Promise<string>(() => undefined)),
+        relaunch: vi.fn(async () => undefined),
+    }
 
     act(() =>
         root.render(
-            <SettingsPage
-                value=""
-                saveStatus="idle"
-                disabled={disabled}
-                appearance="system"
-                onChange={vi.fn()}
-                onBlur={vi.fn()}
-                onAppearanceChange={onAppearanceChange}
-                onBack={vi.fn()}
-            />
+            <UpdaterProvider service={updaterService} autoCheck={false}>
+                <SettingsPage
+                    value=""
+                    saveStatus="idle"
+                    disabled={disabled}
+                    appearance="system"
+                    onChange={vi.fn()}
+                    onBlur={vi.fn()}
+                    onAppearanceChange={onAppearanceChange}
+                    onBack={vi.fn()}
+                />
+            </UpdaterProvider>
         )
     )
 

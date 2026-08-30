@@ -53,6 +53,7 @@ import {
     ThemeSelector,
     useThemeController,
 } from '@/features/themes'
+import {Updater, UpdaterProvider} from '@/features/updater'
 import { tauriDesktopAdapter } from '@/shared/platform/desktop'
 import {ToastAction, useToast} from '@/shared/ui'
 
@@ -113,7 +114,7 @@ function getPdfExportFileName(document: ActiveDocument) {
     return getMarkdownExportFileName(document).replace(/\.md$/, '.pdf')
 }
 
-export default function App() {
+function AppContent() {
     const { toast } = useToast()
     const [page, setPage] = useState<AppPage>('editor')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -1115,5 +1116,14 @@ export default function App() {
                 />
             </div>
         </AppShell>
+    )
+}
+
+export default function App() {
+    return (
+        <UpdaterProvider>
+            <AppContent />
+            <Updater />
+        </UpdaterProvider>
     )
 }

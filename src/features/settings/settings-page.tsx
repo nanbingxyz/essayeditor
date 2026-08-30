@@ -2,6 +2,7 @@ import {ArrowLeftIcon, EyeClosedIcon, EyeOpenIcon, MoonIcon, SunIcon,} from '@ra
 import {DarkThemeRegular} from '@fluentui/react-icons'
 import {useState} from 'react'
 
+import {SettingsUpdateSection} from '@/features/updater'
 import {cn} from '@/shared/lib'
 import {Button, Input, Label} from '@/shared/ui'
 
@@ -151,6 +152,8 @@ export default function SettingsPage({
                     ))}
                 </div>
             </section>
+
+            <SettingsUpdateSection />
         </div>
     )
 }
