@@ -935,6 +935,15 @@ function AppContent() {
         settings.accessToken && activity.error && library.entries.length === 0
             ? activity.error
             : library.error
+    const displayedThemeId = draft.ready
+        ? draft.themeId
+        : (activeDocument?.themeId ?? null)
+    const displayedThemeIsUnknown = Boolean(
+        activeDocument?.kind === 'published' &&
+        activeDocument.themeSlug &&
+        displayedThemeId === null &&
+        (!draft.ready || draft.updatedAt === 0)
+    )
 
     return (
         <AppShell
@@ -959,13 +968,8 @@ function AppContent() {
                         onOpen={() => void themes.refreshIfExpired()}
                         ready={themes.ready}
                         themes={themes.themes}
-                        unknownSelection={Boolean(
-                            activeDocument?.kind === 'published' &&
-                            activeDocument.themeSlug &&
-                            draft.themeId === null &&
-                            draft.updatedAt === 0
-                        )}
-                        value={draft.themeId}
+                        unknownSelection={displayedThemeIsUnknown}
+                        value={displayedThemeId}
                     />
                     <ExportMenu
                         disabled={Boolean(

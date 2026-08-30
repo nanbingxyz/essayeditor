@@ -564,17 +564,35 @@ describe('App navigation', () => {
             root.render(<App />)
             await settle(12)
         })
+
+        let finishDraftLoad: (() => void) | undefined
+        storeFiles
+            .get('drafts.bin')
+            ?.set(
+                'draft:essay:themed-essay',
+                new Promise<undefined>((resolve) => {
+                    finishDraftLoad = () => resolve(undefined)
+                })
+            )
         await act(async () => {
             const essayButton = container.querySelector(
                 '[data-document-id="essay:themed-essay"]'
             ) as HTMLButtonElement
             essayButton.click()
-            await settle()
+            await settle(2)
         })
 
         expect(
+            container.querySelector('button[aria-label="频道：未知频道"]')
+        ).toBeNull()
+        expect(
             container.querySelector('button[aria-label="频道：技术"]')
         ).not.toBeNull()
+
+        await act(async () => {
+            finishDraftLoad?.()
+            await settle()
+        })
         expect(
             container
                 .querySelector('button[aria-label="仅自己可见"]')
