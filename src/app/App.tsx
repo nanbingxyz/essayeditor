@@ -944,6 +944,29 @@ function AppContent() {
             editorStatusLabel={editorStatusLabel}
             editorToolbarActions={
                 <>
+                    <ThemeSelector
+                        disabled={Boolean(
+                            !activeDocument ||
+                            !draft.ready ||
+                            !localDraftsReady ||
+                            !settings.accessToken ||
+                            publishing.loading ||
+                            updating ||
+                            deleting
+                        )}
+                        loading={themes.loading}
+                        onChange={handleThemeChange}
+                        onOpen={() => void themes.refreshIfExpired()}
+                        ready={themes.ready}
+                        themes={themes.themes}
+                        unknownSelection={Boolean(
+                            activeDocument?.kind === 'published' &&
+                            activeDocument.themeSlug &&
+                            draft.themeId === null &&
+                            draft.updatedAt === 0
+                        )}
+                        value={draft.themeId}
+                    />
                     <ExportMenu
                         disabled={Boolean(
                             !activeDocument ||
@@ -972,29 +995,6 @@ function AppContent() {
                             <Open20Regular aria-hidden="true" />
                         </button>
                     )}
-                    <ThemeSelector
-                        disabled={Boolean(
-                            !activeDocument ||
-                            !draft.ready ||
-                            !localDraftsReady ||
-                            !settings.accessToken ||
-                            publishing.loading ||
-                            updating ||
-                            deleting
-                        )}
-                        loading={themes.loading}
-                        onChange={handleThemeChange}
-                        onOpen={() => void themes.refreshIfExpired()}
-                        ready={themes.ready}
-                        themes={themes.themes}
-                        unknownSelection={Boolean(
-                            activeDocument?.kind === 'published' &&
-                            activeDocument.themeSlug &&
-                            draft.themeId === null &&
-                            draft.updatedAt === 0
-                        )}
-                        value={draft.themeId}
-                    />
                     <DeleteDocumentButton
                         deleting={deleting}
                         disabled={Boolean(

@@ -324,17 +324,17 @@ describe('App navigation', () => {
         const exportButton = container.querySelector(
             'button[aria-label="导出"]'
         ) as HTMLButtonElement
+        const themeButton = container.querySelector(
+            'button[aria-label="选择频道"]'
+        ) as HTMLButtonElement
         expect(openButton.title).toBe('打开')
         expect(
-            exportButton.compareDocumentPosition(openButton) &
+            themeButton.compareDocumentPosition(exportButton) &
                 Node.DOCUMENT_POSITION_FOLLOWING
         ).not.toBe(0)
         expect(
-            openButton.compareDocumentPosition(
-                container.querySelector(
-                    'button[aria-label="选择频道"]'
-                ) as HTMLButtonElement
-            ) & Node.DOCUMENT_POSITION_FOLLOWING
+            exportButton.compareDocumentPosition(openButton) &
+                Node.DOCUMENT_POSITION_FOLLOWING
         ).not.toBe(0)
         act(() => openButton.click())
         expect(openExternal).toHaveBeenCalledWith(
