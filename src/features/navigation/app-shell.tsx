@@ -33,6 +33,7 @@ interface AppShellProps {
     rightSidebarContent: ReactNode
     selectedDate: string | null
     sidebarContent: ReactNode
+    sidebarTitlebarContent?: ReactNode
     storeReady: boolean
     user: SidebarAccountUser | null
 }
@@ -77,6 +78,7 @@ export default function AppShell({
     rightSidebarContent,
     selectedDate,
     sidebarContent,
+    sidebarTitlebarContent,
     storeReady,
     user,
 }: AppShellProps) {
@@ -129,6 +131,7 @@ export default function AppShell({
                     >
                         <PanelLeftContract20Regular aria-hidden="true" />
                     </button>
+                    {sidebarTitlebarContent}
                 </div>
 
                 <SidebarCalendar

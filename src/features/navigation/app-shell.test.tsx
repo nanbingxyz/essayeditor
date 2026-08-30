@@ -1,5 +1,6 @@
 import {createRoot, type Root} from 'react-dom/client'
 import {act} from 'react-dom/test-utils'
+import {type ReactNode} from 'react'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 
 import AppShell, {type SidebarAccountUser} from './app-shell'
@@ -32,7 +33,10 @@ interface AccountState {
     user: SidebarAccountUser | null
 }
 
-function renderShell(initialState: AccountState) {
+function renderShell(
+    initialState: AccountState,
+    sidebarTitlebarContent?: ReactNode
+) {
     const container = document.body.appendChild(document.createElement('div'))
     const root = createRoot(container)
     roots.push(root)
@@ -51,6 +55,7 @@ function renderShell(initialState: AccountState) {
                 rightSidebarContent={<div>Notes</div>}
                 selectedDate={null}
                 sidebarContent={<div>Article list</div>}
+                sidebarTitlebarContent={sidebarTitlebarContent}
             >
                 <div>Editor</div>
             </AppShell>
@@ -74,6 +79,26 @@ afterEach(() => {
 })
 
 describe('AppShell account area', () => {
+    it('renders optional content beside the sidebar toggle', () => {
+        const {container} = renderShell(
+            {
+                accountError: false,
+                accountLoading: false,
+                hasAccessToken: false,
+                storeReady: true,
+                user: null,
+            },
+            <span data-testid="sidebar-titlebar-content">Update status</span>
+        )
+        const titlebar = container.querySelector('.sidebar-titlebar')
+        const toggle = titlebar?.querySelector('.sidebar-toggle')
+        const status = titlebar?.querySelector(
+            '[data-testid="sidebar-titlebar-content"]'
+        )
+
+        expect(toggle?.nextElementSibling).toBe(status)
+    })
+
     it('shows settings, loading, and failure states', () => {
         const {container, rerender} = renderShell({
             accountError: false,

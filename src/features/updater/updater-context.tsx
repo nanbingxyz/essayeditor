@@ -9,8 +9,6 @@ import {
     useState,
 } from 'react'
 
-import {useToast} from '@/shared/ui'
-
 import {
     tauriUpdaterService,
     type AvailableUpdate,
@@ -26,21 +24,20 @@ export type UpdaterStatus =
     | 'readyToRestart'
     | 'error'
 
-type CheckSource = 'automatic' | 'manual'
+export type UpdateSource = 'automatic' | 'manual'
 
 interface UpdaterContextValue {
     availableVersion?: string
-    checkForUpdates: (source?: CheckSource) => Promise<void>
+    checkForUpdates: (source?: UpdateSource) => Promise<void>
     currentVersion: string
     downloadAndInstall: () => Promise<void>
     downloadedBytes: number
     errorMessage?: string
     progress?: number
-    promptOpen: boolean
     restart: () => Promise<void>
-    setPromptOpen: (open: boolean) => void
     status: UpdaterStatus
     totalBytes: number
+    updateSource?: UpdateSource
 }
 
 interface UpdaterProviderProps {
@@ -62,25 +59,56 @@ export function UpdaterProvider({
     children,
     service = tauriUpdaterService,
 }: UpdaterProviderProps) {
-    const {toast} = useToast()
     const [availableUpdate, setAvailableUpdate] =
         useState<AvailableUpdate>()
     const [currentVersion, setCurrentVersion] = useState('获取中…')
     const [downloadedBytes, setDownloadedBytes] = useState(0)
     const [errorMessage, setErrorMessage] = useState<string>()
-    const [promptOpen, setPromptOpen] = useState(false)
     const [status, setStatus] = useState<UpdaterStatus>('idle')
     const [totalBytes, setTotalBytes] = useState(0)
+    const [updateSource, setUpdateSource] = useState<UpdateSource>()
     const automaticCheckStarted = useRef(false)
     const busy = useRef(false)
 
+    const installUpdate = useCallback(async (update: AvailableUpdate) => {
+        let downloaded = 0
+        setDownloadedBytes(0)
+        setErrorMessage(undefined)
+        setStatus('downloading')
+        setTotalBytes(0)
+
+        try {
+            await update.downloadAndInstall((event) => {
+                switch (event.event) {
+                    case 'Started':
+                        setTotalBytes(event.data.contentLength ?? 0)
+                        break
+                    case 'Progress':
+                        downloaded += event.data.chunkLength
+                        setDownloadedBytes(downloaded)
+                        break
+                    case 'Finished':
+                        void info('update download finished').catch(
+                            () => undefined
+                        )
+                        break
+                }
+            })
+            setStatus('readyToRestart')
+        } catch {
+            setErrorMessage('更新失败，请检查网络后重试')
+            setStatus('error')
+        }
+    }, [])
+
     const checkForUpdates = useCallback(
-        async (source: CheckSource = 'manual') => {
+        async (source: UpdateSource = 'manual') => {
             if (busy.current) {
                 return
             }
 
             busy.current = true
+            setUpdateSource(source)
             setErrorMessage(undefined)
             setStatus('checking')
 
@@ -98,26 +126,20 @@ export function UpdaterProvider({
                         update.date ?? 'unknown date'
                     } with notes ${update.body ?? ''}`
                 ).catch(() => undefined)
-                setStatus('available')
                 if (source === 'automatic') {
-                    setPromptOpen(true)
+                    await installUpdate(update)
+                } else {
+                    setStatus('available')
                 }
             } catch {
                 setAvailableUpdate(undefined)
                 setErrorMessage('无法检查更新，请检查网络后重试')
                 setStatus('error')
-                if (source === 'automatic') {
-                    toast({
-                        title: '无法检查更新',
-                        description: '你仍可以继续使用当前版本',
-                        variant: 'destructive',
-                    })
-                }
             } finally {
                 busy.current = false
             }
         },
-        [service, toast]
+        [installUpdate, service]
     )
 
     useEffect(() => {
@@ -155,38 +177,13 @@ export function UpdaterProvider({
             return
         }
 
-        let downloaded = 0
         busy.current = true
-        setDownloadedBytes(0)
-        setErrorMessage(undefined)
-        setStatus('downloading')
-        setTotalBytes(0)
-
         try {
-            await availableUpdate.downloadAndInstall((event) => {
-                switch (event.event) {
-                    case 'Started':
-                        setTotalBytes(event.data.contentLength ?? 0)
-                        break
-                    case 'Progress':
-                        downloaded += event.data.chunkLength
-                        setDownloadedBytes(downloaded)
-                        break
-                    case 'Finished':
-                        void info('update download finished').catch(
-                            () => undefined
-                        )
-                        break
-                }
-            })
-            setStatus('readyToRestart')
-        } catch {
-            setErrorMessage('更新失败，请检查网络后重试')
-            setStatus('error')
+            await installUpdate(availableUpdate)
         } finally {
             busy.current = false
         }
-    }, [availableUpdate])
+    }, [availableUpdate, installUpdate])
 
     const restart = useCallback(async () => {
         setErrorMessage(undefined)
@@ -207,11 +204,10 @@ export function UpdaterProvider({
                 downloadedBytes,
                 errorMessage,
                 progress: calculateProgress(downloadedBytes, totalBytes),
-                promptOpen,
                 restart,
-                setPromptOpen,
                 status,
                 totalBytes,
+                updateSource,
             }}
         >
             {children}

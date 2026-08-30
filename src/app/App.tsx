@@ -53,7 +53,7 @@ import {
     ThemeSelector,
     useThemeController,
 } from '@/features/themes'
-import {Updater, UpdaterProvider} from '@/features/updater'
+import {SidebarUpdateStatus, UpdaterProvider} from '@/features/updater'
 import { tauriDesktopAdapter } from '@/shared/platform/desktop'
 import {ToastAction, useToast} from '@/shared/ui'
 
@@ -1040,6 +1040,7 @@ function AppContent() {
                 />
             }
             selectedDate={selectedDate}
+            sidebarTitlebarContent={<SidebarUpdateStatus />}
             sidebarContent={
                 <SidebarEssayList
                     activeDocumentId={activeDocumentKey}
@@ -1123,7 +1124,6 @@ export default function App() {
     return (
         <UpdaterProvider>
             <AppContent />
-            <Updater />
         </UpdaterProvider>
     )
 }

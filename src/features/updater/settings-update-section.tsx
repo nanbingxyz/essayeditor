@@ -9,10 +9,20 @@ export default function SettingsUpdateSection() {
     const checking = updater.status === 'checking'
     const downloading = updater.status === 'downloading'
     const readyToRestart = updater.status === 'readyToRestart'
+    const automaticUpdateActive =
+        updater.updateSource === 'automatic' &&
+        Boolean(updater.availableVersion) &&
+        (downloading || readyToRestart || updater.status === 'error')
     const canRetryDownload =
-        updater.status === 'error' && Boolean(updater.availableVersion)
+        updater.updateSource === 'manual' &&
+        updater.status === 'error' &&
+        Boolean(updater.availableVersion)
 
     const handleAction = () => {
+        if (automaticUpdateActive) {
+            return
+        }
+
         if (readyToRestart) {
             void updater.restart()
         } else if (updater.status === 'available' || canRetryDownload) {
@@ -22,7 +32,13 @@ export default function SettingsUpdateSection() {
         }
     }
 
-    const buttonCopy = checking
+    const buttonCopy = automaticUpdateActive
+        ? readyToRestart
+            ? '已下载'
+            : updater.status === 'error'
+              ? '更新失败'
+              : '正在下载…'
+        : checking
         ? '正在检查…'
         : downloading
           ? '正在下载…'
@@ -35,14 +51,20 @@ export default function SettingsUpdateSection() {
                 : '检查更新'
 
     const statusCopy =
-        updater.errorMessage ??
-        (updater.status === 'upToDate'
-            ? '已是最新版本'
-            : updater.status === 'available'
-              ? `发现新版本 ${updater.availableVersion}`
-              : readyToRestart
-                ? '更新已安装'
-                : '')
+        automaticUpdateActive
+            ? readyToRestart
+                ? '更新已下载，请在侧栏重启'
+                : updater.status === 'error'
+                  ? '自动更新失败，请在侧栏重试'
+                  : `正在自动下载 v${updater.availableVersion}`
+            : updater.errorMessage ??
+              (updater.status === 'upToDate'
+                  ? '已是最新版本'
+                  : updater.status === 'available'
+                    ? `发现新版本 ${updater.availableVersion}`
+                    : readyToRestart
+                      ? '更新已安装'
+                      : '')
 
     return (
         <section
@@ -65,7 +87,7 @@ export default function SettingsUpdateSection() {
                     variant="secondary"
                     className='text-xs'
                     size="sm"
-                    disabled={checking || downloading}
+                    disabled={checking || downloading || automaticUpdateActive}
                     onClick={handleAction}
                 >
                     {(checking || downloading) && (
@@ -86,7 +108,7 @@ export default function SettingsUpdateSection() {
                 </small>
             </div>
 
-            {downloading && (
+            {downloading && updater.updateSource === 'manual' && (
                 <div className="update-progress">
                     <Progress
                         value={updater.progress}
