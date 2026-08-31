@@ -1,6 +1,6 @@
 import {defaultKeymap, history, historyKeymap} from '@codemirror/commands'
 import {markdown, markdownLanguage} from '@codemirror/lang-markdown'
-import {Compartment, EditorState} from '@codemirror/state'
+import {Compartment, EditorState, Transaction} from '@codemirror/state'
 import {
     drawSelection,
     EditorView,
@@ -30,13 +30,24 @@ export interface MarkdownEditorHandle {
     setValue: (value: string) => void
 }
 
+export interface MarkdownEditorReadyMetrics {
+    prepareTransactionDuration: number
+    requestMeasureDuration: number
+    resetScrollDuration: number
+    totalDuration: number
+    updateViewDuration: number
+}
+
 interface MarkdownEditorProps {
     ariaLabel?: string
     disabled?: boolean
     documentKey?: string
     initialValue?: string
     onChange?: (content: string) => void
-    onReady?: (documentKey: string) => void
+    onReady?: (
+        documentKey: string,
+        metrics?: MarkdownEditorReadyMetrics
+    ) => void
     placeholder?: string
     value?: string
 }
@@ -59,6 +70,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         const viewRef = useRef<EditorView>()
         const onChangeRef = useRef(onChange)
         const onReadyRef = useRef(onReady)
+        const historyCompartmentRef = useRef(new Compartment())
         const readOnlyCompartmentRef = useRef(new Compartment())
         const applyingValueRef = useRef(false)
         const currentDocumentKeyRef = useRef(documentKey)
@@ -75,7 +87,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             return EditorState.create({
                 doc: content,
                 extensions: [
-                    history(),
+                    historyCompartmentRef.current.of(history()),
                     drawSelection(),
                     EditorView.lineWrapping,
                     markdown({base: markdownLanguage}),
@@ -109,13 +121,16 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             })
         }
 
-        const reportReady = (key: string) => {
+        const reportReady = (
+            key: string,
+            metrics?: MarkdownEditorReadyMetrics
+        ) => {
             if (readyFrameRef.current !== undefined) {
                 cancelAnimationFrame(readyFrameRef.current)
             }
             readyFrameRef.current = requestAnimationFrame(() => {
                 readyFrameRef.current = undefined
-                onReadyRef.current?.(key)
+                onReadyRef.current?.(key, metrics)
             })
         }
 
@@ -195,14 +210,48 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             }
 
             if (currentDocumentKeyRef.current !== documentKey) {
-                applyingValueRef.current = true
-                view.setState(createState(editorValue))
-                applyingValueRef.current = false
-                currentDocumentKeyRef.current = documentKey
+                const switchStartedAt = performance.now()
+                const resetScrollStartedAt = performance.now()
                 view.scrollDOM.scrollTop = 0
                 view.scrollDOM.scrollLeft = 0
+                const resetScrollDuration =
+                    performance.now() - resetScrollStartedAt
+                applyingValueRef.current = true
+                const prepareTransactionStartedAt = performance.now()
+                const replaceDocument = view.state.update({
+                    annotations: Transaction.addToHistory.of(false),
+                    changes: {
+                        from: 0,
+                        to: view.state.doc.length,
+                        insert: editorValue,
+                    },
+                    effects: historyCompartmentRef.current.reconfigure([]),
+                    selection: {anchor: 0},
+                })
+                const restoreHistory = replaceDocument.state.update({
+                    effects: historyCompartmentRef.current.reconfigure(
+                        history()
+                    ),
+                })
+                const prepareTransactionDuration =
+                    performance.now() - prepareTransactionStartedAt
+                const updateViewStartedAt = performance.now()
+                view.update([replaceDocument, restoreHistory])
+                const updateViewDuration =
+                    performance.now() - updateViewStartedAt
+                applyingValueRef.current = false
+                currentDocumentKeyRef.current = documentKey
+                const requestMeasureStartedAt = performance.now()
                 view.requestMeasure()
-                reportReady(documentKey)
+                const requestMeasureDuration =
+                    performance.now() - requestMeasureStartedAt
+                reportReady(documentKey, {
+                    prepareTransactionDuration,
+                    requestMeasureDuration,
+                    resetScrollDuration,
+                    totalDuration: performance.now() - switchStartedAt,
+                    updateViewDuration,
+                })
                 return
             }
 

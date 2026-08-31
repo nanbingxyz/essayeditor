@@ -1,4 +1,5 @@
 import {createRef} from 'react'
+import {EditorView} from '@codemirror/view'
 import {createRoot, type Root} from 'react-dom/client'
 import {act} from 'react-dom/test-utils'
 import {afterEach, describe, expect, it, vi} from 'vitest'
@@ -10,10 +11,12 @@ const roots: Root[] = []
 afterEach(() => {
     roots.splice(0).forEach((root) => act(() => root.unmount()))
     document.body.replaceChildren()
+    vi.restoreAllMocks()
 })
 
 describe('MarkdownEditor document switching', () => {
     it('reuses the EditorView and does not emit a change while switching', () => {
+        const setState = vi.spyOn(EditorView.prototype, 'setState')
         const container = document.body.appendChild(
             document.createElement('div')
         )
@@ -33,6 +36,11 @@ describe('MarkdownEditor document switching', () => {
             )
         })
         const editorDom = container.querySelector('.cm-editor')
+        const scrollDom = container.querySelector(
+            '.cm-scroller'
+        ) as HTMLElement
+        scrollDom.scrollTop = 120
+        scrollDom.scrollLeft = 40
         expect(editorRef.current?.getValue()).toBe('First article')
 
         act(() => {
@@ -47,7 +55,10 @@ describe('MarkdownEditor document switching', () => {
         })
 
         expect(container.querySelector('.cm-editor')).toBe(editorDom)
+        expect(scrollDom.scrollTop).toBe(0)
+        expect(scrollDom.scrollLeft).toBe(0)
         expect(editorRef.current?.getValue()).toBe('Second article')
+        expect(setState).not.toHaveBeenCalled()
         expect(onChange).not.toHaveBeenCalled()
     })
 

@@ -14,4 +14,7 @@ export {default as MarkdownEditor} from './markdown-editor'
 export {createMarkdownPdf} from './markdown-pdf'
 export {useDraftController} from './use-draft-controller'
 export type {DraftDocumentSeed} from './use-draft-controller'
-export type {MarkdownEditorHandle} from './markdown-editor'
+export type {
+    MarkdownEditorHandle,
+    MarkdownEditorReadyMetrics,
+} from './markdown-editor'

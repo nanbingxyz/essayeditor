@@ -4,7 +4,10 @@ import { forwardRef } from 'react'
 import { Button, Toggle } from '@/shared/ui'
 import { getRelativeTime } from '@/shared/lib/timing'
 
-import MarkdownEditor, { type MarkdownEditorHandle } from './markdown-editor'
+import MarkdownEditor, {
+    type MarkdownEditorHandle,
+    type MarkdownEditorReadyMetrics,
+} from './markdown-editor'
 import { cn } from '@/shared/lib'
 
 interface EditorPageProps {
@@ -17,7 +20,10 @@ interface EditorPageProps {
     isPrivate: boolean
     loading: boolean
     onContentChange: (content: string) => void
-    onEditorReady?: (documentKey: string) => void
+    onEditorReady?: (
+        documentKey: string,
+        metrics?: MarkdownEditorReadyMetrics
+    ) => void
     onPrivateChange: (isPrivate: boolean) => void
     onPublish: () => void
     publishReady: boolean

@@ -26,6 +26,7 @@ import {
     getLocalDraftDocumentKey,
     type LocalDraft,
     type MarkdownEditorHandle,
+    type MarkdownEditorReadyMetrics,
     useDraftController,
 } from '@/features/editor'
 import {
@@ -202,6 +203,7 @@ function AppContent() {
     const localDraftsRef = useRef<LocalDraft[]>([])
     const pendingPublishRef = useRef<PendingPublish | null>(null)
     const pendingSwitchMeasureRef = useRef<{
+        activeDuration?: number
         key: string
         startMark: string
     }>()
@@ -312,44 +314,57 @@ function AppContent() {
         console.debug(
             `[performance] essay selection committed in ${measurement.duration.toFixed(1)}ms`
         )
+        pending.activeDuration = measurement.duration
         performance.clearMarks(activeMark)
         performance.clearMeasures('essay-switch-to-active')
     }, [activeDocumentKey])
 
-    const handleEditorReady = useCallback((documentKey: string) => {
-        const pending = pendingSwitchMeasureRef.current
-        if (
-            !import.meta.env.DEV ||
-            import.meta.env.MODE === 'test' ||
-            !pending ||
-            pending.key !== documentKey ||
-            typeof performance.mark !== 'function' ||
-            typeof performance.measure !== 'function'
-        ) {
-            return
-        }
-        const readyMark = `${pending.startMark}:editor-ready`
-        performance.mark(readyMark)
-        const measurement = performance.measure(
-            'essay-switch-to-editor-ready',
-            pending.startMark,
-            readyMark
-        )
-        const samples = switchReadySamplesRef.current
-        samples.push(measurement.duration)
-        if (samples.length > 100) {
-            samples.shift()
-        }
-        console.debug(
-            `[performance] essay switch ready in ${measurement.duration.toFixed(1)}ms ` +
-            `(n=${samples.length}, p50=${getPercentile(samples, 50).toFixed(1)}ms, ` +
-            `p95=${getPercentile(samples, 95).toFixed(1)}ms, ` +
-            `p99=${getPercentile(samples, 99).toFixed(1)}ms)`
-        )
-        performance.clearMarks(readyMark)
-        performance.clearMeasures('essay-switch-to-editor-ready')
-        pendingSwitchMeasureRef.current = undefined
-    }, [])
+    const handleEditorReady = useCallback(
+        (
+            documentKey: string,
+            editorMetrics?: MarkdownEditorReadyMetrics
+        ) => {
+            const pending = pendingSwitchMeasureRef.current
+            if (
+                !import.meta.env.DEV ||
+                import.meta.env.MODE === 'test' ||
+                !pending ||
+                pending.key !== documentKey ||
+                typeof performance.mark !== 'function' ||
+                typeof performance.measure !== 'function'
+            ) {
+                return
+            }
+            const readyMark = `${pending.startMark}:editor-ready`
+            performance.mark(readyMark)
+            const measurement = performance.measure(
+                'essay-switch-to-editor-ready',
+                pending.startMark,
+                readyMark
+            )
+            const samples = switchReadySamplesRef.current
+            samples.push(measurement.duration)
+            if (samples.length > 100) {
+                samples.shift()
+            }
+            const message =
+                `[performance] essay switch ready in ${measurement.duration.toFixed(1)}ms ` +
+                `(n=${samples.length}, p50=${getPercentile(samples, 50).toFixed(1)}ms, ` +
+                `p95=${getPercentile(samples, 95).toFixed(1)}ms, ` +
+                `p99=${getPercentile(samples, 99).toFixed(1)}ms, ` +
+                `active=${pending.activeDuration?.toFixed(1) ?? 'unknown'}ms, ` +
+                `editor-prepare=${editorMetrics?.prepareTransactionDuration.toFixed(1) ?? 'unknown'}ms, ` +
+                `editor-update=${editorMetrics?.updateViewDuration.toFixed(1) ?? 'unknown'}ms, ` +
+                `editor-scroll=${editorMetrics?.resetScrollDuration.toFixed(1) ?? 'unknown'}ms, ` +
+                `editor-measure=${editorMetrics?.requestMeasureDuration.toFixed(1) ?? 'unknown'}ms, ` +
+                `editor-total=${editorMetrics?.totalDuration.toFixed(1) ?? 'unknown'}ms)`
+            console.debug(message)
+            performance.clearMarks(readyMark)
+            performance.clearMeasures('essay-switch-to-editor-ready')
+            pendingSwitchMeasureRef.current = undefined
+        },
+        []
+    )
 
     const notifyActivityError = useCallback(
         (message: string) => {
