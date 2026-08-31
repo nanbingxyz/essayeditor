@@ -1,12 +1,12 @@
-import {ArrowLeftIcon, EyeClosedIcon, EyeOpenIcon, MoonIcon, SunIcon,} from '@radix-ui/react-icons'
-import {DarkThemeRegular} from '@fluentui/react-icons'
-import {useState} from 'react'
+import { ArrowLeftIcon, EyeClosedIcon, EyeOpenIcon, MoonIcon, SunIcon, } from '@radix-ui/react-icons'
+import { DarkThemeRegular } from '@fluentui/react-icons'
+import { useState } from 'react'
 
-import {SettingsUpdateSection} from '@/features/updater'
-import {cn} from '@/shared/lib'
-import {Button, Input, Label} from '@/shared/ui'
-
-import type {ApiKeySaveStatus, Appearance} from './model'
+import { SettingsUpdateSection } from '@/features/updater'
+import { cn } from '@/shared/lib'
+import { Button, Input, Label } from '@/shared/ui'
+import { tauriDesktopAdapter } from '@/shared/platform/desktop'
+import type { ApiKeySaveStatus, Appearance } from './model'
 
 interface SettingsPageProps {
     appearance: Appearance
@@ -39,7 +39,7 @@ export default function SettingsPage({
     const [showApiKey, setShowApiKey] = useState(false)
 
     return (
-        <div className="settings-page">
+        <div className="settings-page flex flex-col">
             <header className="settings-page-header">
                 <Button
                     type="button"
@@ -54,7 +54,7 @@ export default function SettingsPage({
                 </Button>
                 <div>
                     <h1>设置</h1>
-                    <p>Essay Editor 的本地设置</p>
+                    <p>Essay Editor 本地设置</p>
                 </div>
             </header>
 
@@ -123,9 +123,9 @@ export default function SettingsPage({
                 >
                     {(
                         [
-                            ['light', '浅色', '始终使用浅色外观', <SunIcon/>],
-                            ['dark', '暗色', '始终使用暗色外观', <MoonIcon/>],
-                            ['system', '跟随系统', '根据系统设置自动切换', <DarkThemeRegular/>],
+                            ['light', '浅色', '始终使用浅色外观', <SunIcon />],
+                            ['dark', '暗色', '始终使用暗色外观', <MoonIcon />],
+                            ['system', '跟随系统', '根据系统设置自动切换', <DarkThemeRegular />],
                         ] as const
                     ).map(([option, label, description, icon]) => (
                         <label
@@ -154,6 +154,11 @@ export default function SettingsPage({
             </section>
 
             <SettingsUpdateSection />
+            <div className="grow"></div>
+            <div className='mt-6'>
+                <button className='text-muted-foreground text-sm font-serif font-medium' onClick={() => tauriDesktopAdapter.openExternal('https://www.essay.ink')}>Essay</button>
+                <p className='text-[11px] text-muted-foreground'>文字，在此自由流淌</p>
+            </div>
         </div>
     )
 }
