@@ -18,6 +18,12 @@
       "allow": [
         {
           "url": "https://api.essay.ink"
+        },
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://*"
         }
       ]
     }

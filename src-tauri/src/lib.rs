@@ -91,6 +91,22 @@ async fn export_pdf(
     )
 }
 
+#[tauri::command]
+async fn export_docx(
+    app: tauri::AppHandle,
+    content: Vec<u8>,
+    default_file_name: String,
+) -> Result<bool, String> {
+    save_export_file(
+        &app,
+        content,
+        default_file_name,
+        "导出 DOCX 文件",
+        "Word 文档",
+        "docx",
+    )
+}
+
 fn save_export_file(
     app: &tauri::AppHandle,
     content: Vec<u8>,
@@ -130,6 +146,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             export_markdown,
             export_pdf,
+            export_docx,
             set_macos_window_appearance
         ])
         .run(tauri::generate_context!())

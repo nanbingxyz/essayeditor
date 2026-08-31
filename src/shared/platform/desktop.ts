@@ -13,6 +13,10 @@ export interface DesktopAdapter {
         content: Uint8Array,
         defaultFileName: string
     ) => Promise<boolean>
+    exportDocx: (
+        content: Uint8Array,
+        defaultFileName: string
+    ) => Promise<boolean>
     openExternal: (url: string) => Promise<void>
     interceptClose: (
         flushBeforeClose: () => Promise<boolean>
@@ -26,6 +30,11 @@ export const tauriDesktopAdapter: DesktopAdapter = {
         invoke<boolean>('export_markdown', {content, defaultFileName}),
     exportPdf: (content, defaultFileName) =>
         invoke<boolean>('export_pdf', {
+            content: Array.from(content),
+            defaultFileName,
+        }),
+    exportDocx: (content, defaultFileName) =>
+        invoke<boolean>('export_docx', {
             content: Array.from(content),
             defaultFileName,
         }),

@@ -188,6 +188,10 @@ function getPdfExportFileName(document: ActiveDocument) {
     return getMarkdownExportFileName(document).replace(/\.md$/, '.pdf')
 }
 
+function getDocxExportFileName(document: ActiveDocument) {
+    return getMarkdownExportFileName(document).replace(/\.md$/, '.docx')
+}
+
 function AppContent() {
     const { toast } = useToast()
     const [page, setPage] = useState<AppPage>('editor')
@@ -197,6 +201,7 @@ function AppContent() {
     const [localDrafts, setLocalDrafts] = useState<LocalDraft[]>([])
     const [localDraftsReady, setLocalDraftsReady] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const [exportingDocx, setExportingDocx] = useState(false)
     const [exportingPdf, setExportingPdf] = useState(false)
     const [updating, setUpdating] = useState(false)
     const editorRef = useRef<MarkdownEditorHandle>(null)
@@ -1027,6 +1032,39 @@ function AppContent() {
         }
     }
 
+    const exportDocx = async () => {
+        if (!activeDocument || !draft.ready || exportingDocx) {
+            return
+        }
+
+        const content = editorRef.current?.getValue() ?? draft.content
+        setExportingDocx(true)
+        try {
+            const {createMarkdownDocx} = await import(
+                '@/features/editor/markdown-docx'
+            )
+            const docx = await createMarkdownDocx(content)
+            const exported = await tauriDesktopAdapter.exportDocx(
+                docx,
+                getDocxExportFileName(activeDocument)
+            )
+            if (exported) {
+                toast({title: 'DOCX 文件已导出', variant: 'success'})
+            }
+        } catch (error) {
+            toast({
+                title: '导出失败',
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : '请稍后重试',
+                variant: 'destructive',
+            })
+        } finally {
+            setExportingDocx(false)
+        }
+    }
+
     const handleContentChange = (content: string) => {
         if (!activeDocument) {
             return
@@ -1204,8 +1242,10 @@ function AppContent() {
                             publishing.loading ||
                             updating ||
                             deleting ||
+                            exportingDocx ||
                             exportingPdf
                         )}
+                        onExportDocx={exportDocx}
                         onExportMarkdown={exportMarkdown}
                         onExportPdf={exportPdf}
                     />

@@ -8,6 +8,7 @@ import {Toaster} from '@/shared/ui'
 
 const {
     closeHandlers,
+    createDocxBytes,
     createPdfBytes,
     destroyWindow,
     draftSaveGate,
@@ -19,6 +20,7 @@ const {
     closeHandlers: [] as Array<
         (event: {preventDefault: () => void}) => void | Promise<void>
     >,
+    createDocxBytes: vi.fn(async () => Uint8Array.from([80, 75, 3, 4])),
     createPdfBytes: vi.fn(async () =>
         Uint8Array.from([37, 80, 68, 70])
     ),
@@ -32,6 +34,10 @@ const {
 
 vi.mock('@/features/editor/markdown-pdf', () => ({
     createMarkdownPdf: createPdfBytes,
+}))
+
+vi.mock('@/features/editor/markdown-docx', () => ({
+    createMarkdownDocx: createDocxBytes,
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -450,6 +456,16 @@ describe('App navigation', () => {
         expect(invokeNative).toHaveBeenCalledWith('export_markdown', {
             content: 'Publish me',
             defaultFileName: 'essay_real-id.md',
+        })
+        act(() => exportButton.click())
+        await act(async () => {
+            buttonWithText('导出为 DOCX 文件')?.click()
+            await settle()
+        })
+        expect(createDocxBytes).toHaveBeenCalledWith('Publish me')
+        expect(invokeNative).toHaveBeenCalledWith('export_docx', {
+            content: [80, 75, 3, 4],
+            defaultFileName: 'essay_real-id.docx',
         })
         act(() => exportButton.click())
         await act(async () => {

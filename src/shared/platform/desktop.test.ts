@@ -79,6 +79,21 @@ describe('tauriDesktopAdapter', () => {
         })
     })
 
+    it('exports DOCX bytes with the requested default file name', async () => {
+        vi.mocked(invoke).mockResolvedValueOnce(true)
+
+        const exported = await tauriDesktopAdapter.exportDocx(
+            new Uint8Array([80, 75, 3, 4]),
+            'essay_42.docx'
+        )
+
+        expect(exported).toBe(true)
+        expect(invoke).toHaveBeenCalledWith('export_docx', {
+            content: [80, 75, 3, 4],
+            defaultFileName: 'essay_42.docx',
+        })
+    })
+
     it('waits for pending drafts before destroying the window', async () => {
         let closeHandler:
             | ((event: {preventDefault: () => void}) => Promise<void>)
