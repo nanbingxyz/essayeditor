@@ -1,7 +1,7 @@
 import {
     ArrowCircleDownRight20Regular,
     DocumentPdf20Regular,
-    Document20Regular,
+    DocumentWord20Regular,
     Markdown20Regular,
 } from '@fluentui/react-icons'
 import {useEffect, useRef, useState} from 'react'
@@ -88,7 +88,7 @@ export default function ExportMenu({
                         role="menuitem"
                         onClick={exportDocx}
                     >
-                        <Document20Regular aria-hidden="true" />
+                        <DocumentWord20Regular aria-hidden="true" />
                         导出为 DOCX 文件
                     </button>
                     <button

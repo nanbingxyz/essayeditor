@@ -27,8 +27,8 @@ importers:
         specifier: ^6.43.9
         version: 6.43.9
       '@fluentui/react-icons':
-        specifier: ^2.0.316
-        version: 2.0.316(react@18.2.0)
+        specifier: ^2.0.333
+        version: 2.0.333(react@18.2.0)
       '@fontsource-variable/noto-serif-sc':
         specifier: ^5.1.0
         version: 5.3.0
@@ -469,8 +469,8 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@fluentui/react-icons@2.0.316':
-    resolution: {integrity: sha512-tZPOtsUmoOrgLeM/rLjkzLlWOEmIghXNh/DYQzm5RD/Q4epklOzjnsFvc/Mn2tuXiVxi+vvXxsQp21E1aLpmWg==}
+  '@fluentui/react-icons@2.0.333':
+    resolution: {integrity: sha512-HvS5kKw9tGweI3Poy6OGAiFqrt6HGElO46DFhNBeoIQRK/q35mZ2ep0u762MFuvOfLX3bVGSB8frORFTjh1E7A==}
     peerDependencies:
       react: '>=16.8.0 <20.0.0'
 
@@ -2824,7 +2824,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@fluentui/react-icons@2.0.316(react@18.2.0)':
+  '@fluentui/react-icons@2.0.333(react@18.2.0)':
     dependencies:
       '@griffel/react': 1.7.7(react@18.2.0)
       react: 18.2.0
