@@ -11,12 +11,13 @@ interface EditorPageProps {
     active: boolean
     actionLabel: string
     backupTimestamp: number
+    content: string
     disabled: boolean
-    editorKey: string
-    initialContent: string
+    documentKey: string
     isPrivate: boolean
     loading: boolean
     onContentChange: (content: string) => void
+    onEditorReady?: (documentKey: string) => void
     onPrivateChange: (isPrivate: boolean) => void
     onPublish: () => void
     publishReady: boolean
@@ -29,12 +30,13 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
             active,
             actionLabel,
             backupTimestamp,
+            content,
             disabled,
-            editorKey,
-            initialContent,
+            documentKey,
             isPrivate,
             loading,
             onContentChange,
+            onEditorReady,
             onPrivateChange,
             onPublish,
             publishReady,
@@ -45,11 +47,12 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
         <div className={`editor-page ${active ? '' : 'is-page-hidden'}`}>
             {ready ? (
                 <MarkdownEditor
-                    key={editorKey}
                     ref={ref}
-                    initialValue={initialContent}
+                    documentKey={documentKey}
+                    value={content}
                     disabled={disabled}
                     onChange={onContentChange}
+                    onReady={onEditorReady}
                 />
             ) : (
                 <div

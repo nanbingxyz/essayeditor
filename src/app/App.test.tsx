@@ -6,15 +6,23 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 import {Toaster} from '@/shared/ui'
 
 const {
+    closeHandlers,
     createPdfBytes,
+    destroyWindow,
+    draftSaveGate,
     httpFetch,
     invokeNative,
     openExternal,
     storeFiles,
 } = vi.hoisted(() => ({
+    closeHandlers: [] as Array<
+        (event: {preventDefault: () => void}) => void | Promise<void>
+    >,
     createPdfBytes: vi.fn(async () =>
         Uint8Array.from([37, 80, 68, 70])
     ),
+    destroyWindow: vi.fn(async () => undefined),
+    draftSaveGate: {promise: undefined as Promise<void> | undefined},
     httpFetch: vi.fn(),
     invokeNative: vi.fn(async () => undefined),
     openExternal: vi.fn(async () => undefined),
@@ -31,6 +39,16 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 vi.mock('@tauri-apps/api/window', () => ({
     getCurrentWindow: () => ({
+        destroy: destroyWindow,
+        onCloseRequested: vi.fn(async (handler) => {
+            closeHandlers.push(handler)
+            return () => {
+                const index = closeHandlers.indexOf(handler)
+                if (index >= 0) {
+                    closeHandlers.splice(index, 1)
+                }
+            }
+        }),
         setTheme: vi.fn(async () => undefined),
         show: vi.fn(async () => undefined),
     }),
@@ -51,7 +69,11 @@ vi.mock('@tauri-apps/plugin-store', () => ({
         return {
             delete: vi.fn(async (key: string) => values.delete(key)),
             get: vi.fn(async <T,>(key: string) => values.get(key) as T),
-            save: vi.fn(async () => undefined),
+            save: vi.fn(async () => {
+                if (path === 'drafts.bin' && draftSaveGate.promise) {
+                    await draftSaveGate.promise
+                }
+            }),
             set: vi.fn(async (key: string, value: unknown) => {
                 values.set(key, value)
             }),
@@ -82,6 +104,9 @@ afterEach(() => {
     createPdfBytes.mockClear()
     invokeNative.mockClear()
     openExternal.mockClear()
+    closeHandlers.splice(0)
+    destroyWindow.mockClear()
+    draftSaveGate.promise = undefined
     storeFiles.clear()
 })
 
@@ -221,6 +246,72 @@ describe('App navigation', () => {
         expect(
             container.querySelector('.essay-new-item.is-active')?.textContent
         ).toBe('草稿')
+    })
+
+    it('switches immediately while the previous draft is still saving', async () => {
+        storeFiles.set(
+            'drafts.bin',
+            new Map([
+                [
+                    'localDrafts',
+                    {
+                        version: 2,
+                        drafts: [
+                            {
+                                localId: 'first',
+                                content: 'First article',
+                                createdAt: 2,
+                                isPrivate: false,
+                                themeId: null,
+                                updatedAt: 2,
+                            },
+                            {
+                                localId: 'second',
+                                content: 'Second article',
+                                createdAt: 1,
+                                isPrivate: false,
+                                themeId: null,
+                                updatedAt: 1,
+                            },
+                        ],
+                    },
+                ],
+            ])
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+        await act(async () => {
+            root.render(<App />)
+            await settle()
+        })
+
+        let finishSave: (() => void) | undefined
+        draftSaveGate.promise = new Promise<void>((resolve) => {
+            finishSave = resolve
+        })
+        const privateToggle = container.querySelector(
+            'button[aria-label="仅自己可见"]'
+        ) as HTMLButtonElement
+        act(() => privateToggle.click())
+
+        const secondArticle = container.querySelector(
+            '[data-document-id="local:second"]'
+        ) as HTMLButtonElement
+        act(() => secondArticle.click())
+
+        expect(secondArticle.className).toContain('is-active')
+        expect(container.querySelector('.editor-loading-skeleton')).toBeNull()
+        expect(container.querySelector('.cm-content')?.textContent).toContain(
+            'Second article'
+        )
+
+        await act(async () => {
+            finishSave?.()
+            await settle()
+        })
     })
 
     it('replaces a published draft with the server id without clearing content', async () => {

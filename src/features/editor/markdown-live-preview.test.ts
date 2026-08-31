@@ -2,7 +2,7 @@ import {history, redo, undo} from '@codemirror/commands'
 import {markdown, markdownLanguage} from '@codemirror/lang-markdown'
 import {EditorState} from '@codemirror/state'
 import {EditorView} from '@codemirror/view'
-import {afterEach, describe, expect, it} from 'vitest'
+import {afterEach, describe, expect, it, vi} from 'vitest'
 
 import {
     getSafeHttpUrl,
@@ -44,6 +44,7 @@ function createView(
 afterEach(() => {
     views.splice(0).forEach((view) => view.destroy())
     document.body.replaceChildren()
+    vi.useRealTimers()
 })
 
 describe('markdown live preview', () => {
@@ -88,6 +89,7 @@ describe('markdown live preview', () => {
     })
 
     it('renders quotes, lists, rules, images, and GFM tables', () => {
+        vi.useFakeTimers()
         const source = [
             '> quote',
             '',
@@ -109,6 +111,12 @@ describe('markdown live preview', () => {
         expect(view.dom.querySelector('.cm-md-blockquote')).not.toBeNull()
         expect(view.dom.querySelectorAll('.cm-md-list-item')).toHaveLength(2)
         expect(view.dom.querySelector('.cm-md-horizontal-rule')).not.toBeNull()
+        expect(view.dom.querySelector('.cm-md-image-preview.is-pending'))
+            .not.toBeNull()
+        expect(view.dom.querySelector('.cm-md-image-preview img')).toBeNull()
+
+        vi.advanceTimersByTime(120)
+
         expect(
             view.dom.querySelector<HTMLImageElement>('.cm-md-image-preview img')
                 ?.src
@@ -160,6 +168,21 @@ describe('markdown live preview', () => {
         expect(view.dom.querySelector('.cm-md-table-preview')).toBeNull()
         expect(view.dom.querySelector('.cm-md-image-preview img')).toBeNull()
         expect(view.dom.textContent).not.toContain('图片无法加载')
+    })
+
+    it('cancels a deferred image when its source is revealed first', () => {
+        vi.useFakeTimers()
+        const source =
+            '![alt](https://example.com/image.png)\n\nend'
+        const view = createView(source, source.length, false)
+
+        expect(view.dom.querySelector('.cm-md-image-preview.is-pending'))
+            .not.toBeNull()
+        view.dispatch({selection: {anchor: 2}})
+        expect(view.dom.querySelector('.cm-md-image-preview')).toBeNull()
+
+        vi.advanceTimersByTime(120)
+        expect(view.dom.querySelector('.cm-md-image-preview img')).toBeNull()
     })
 })
 

@@ -173,6 +173,26 @@ class HorizontalRuleWidget extends RevealWidget {
     }
 }
 
+interface IdleWindow {
+    cancelIdleCallback?: (handle: number) => void
+    requestIdleCallback?: (
+        callback: () => void,
+        options?: {timeout: number}
+    ) => number
+}
+
+function scheduleIdleWork(callback: () => void) {
+    const idleWindow = window as unknown as IdleWindow
+    if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
+        const handle = idleWindow.requestIdleCallback(callback, {timeout: 500})
+        return () => idleWindow.cancelIdleCallback?.(handle)
+    }
+    const handle = window.setTimeout(callback, 120)
+    return () => window.clearTimeout(handle)
+}
+
+const imageLoadCancellations = new WeakMap<HTMLElement, () => void>()
+
 class ImageWidget extends RevealWidget {
     constructor(
         from: number,
@@ -203,7 +223,6 @@ class ImageWidget extends RevealWidget {
         }
 
         const image = document.createElement('img')
-        image.src = safeSource
         image.alt = this.alt
         image.loading = 'lazy'
         image.decoding = 'async'
@@ -215,8 +234,24 @@ class ImageWidget extends RevealWidget {
                 ? `图片无法加载：${this.alt}`
                 : '图片无法加载'
         })
-        wrapper.append(image)
+        wrapper.classList.add('is-pending')
+        wrapper.textContent = this.alt || '图片预览'
+        const cancel = scheduleIdleWork(() => {
+            imageLoadCancellations.delete(wrapper)
+            if (!wrapper.isConnected) {
+                return
+            }
+            image.src = safeSource
+            wrapper.classList.remove('is-pending')
+            wrapper.replaceChildren(image)
+        })
+        imageLoadCancellations.set(wrapper, cancel)
         return wrapper
+    }
+
+    destroy(dom: HTMLElement) {
+        imageLoadCancellations.get(dom)?.()
+        imageLoadCancellations.delete(dom)
     }
 }
 

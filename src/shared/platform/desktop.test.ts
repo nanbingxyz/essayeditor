@@ -78,4 +78,58 @@ describe('tauriDesktopAdapter', () => {
             defaultFileName: 'essay_42.pdf',
         })
     })
+
+    it('waits for pending drafts before destroying the window', async () => {
+        let closeHandler:
+            | ((event: {preventDefault: () => void}) => Promise<void>)
+            | undefined
+        let finishFlush: ((saved: boolean) => void) | undefined
+        const destroy = vi.fn(async () => undefined)
+        const unlisten = vi.fn()
+        const onCloseRequested = vi.fn(async (handler) => {
+            closeHandler = handler
+            return unlisten
+        })
+        vi.mocked(getCurrentWindow).mockReturnValue({
+            destroy,
+            onCloseRequested,
+        } as unknown as ReturnType<typeof getCurrentWindow>)
+        const flush = vi.fn(
+            () =>
+                new Promise<boolean>((resolve) => {
+                    finishFlush = resolve
+                })
+        )
+        const stopIntercepting = await tauriDesktopAdapter.interceptClose(flush)
+        const preventDefault = vi.fn()
+
+        const closeTask = closeHandler?.({preventDefault})
+        await Promise.resolve()
+        expect(preventDefault).toHaveBeenCalledOnce()
+        expect(destroy).not.toHaveBeenCalled()
+
+        finishFlush?.(true)
+        await closeTask
+        expect(destroy).toHaveBeenCalledOnce()
+        stopIntercepting()
+        expect(unlisten).toHaveBeenCalledOnce()
+    })
+
+    it('keeps the window open when draft persistence fails', async () => {
+        let closeHandler:
+            | ((event: {preventDefault: () => void}) => Promise<void>)
+            | undefined
+        const destroy = vi.fn(async () => undefined)
+        vi.mocked(getCurrentWindow).mockReturnValue({
+            destroy,
+            onCloseRequested: vi.fn(async (handler) => {
+                closeHandler = handler
+                return () => undefined
+            }),
+        } as unknown as ReturnType<typeof getCurrentWindow>)
+        await tauriDesktopAdapter.interceptClose(async () => false)
+
+        await closeHandler?.({preventDefault: vi.fn()})
+        expect(destroy).not.toHaveBeenCalled()
+    })
 })

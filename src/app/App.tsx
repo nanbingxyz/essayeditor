@@ -3,7 +3,14 @@ import '@fontsource/barlow/latin-500.css'
 import '@fontsource/barlow/latin-600.css'
 import '@fontsource/barlow/latin-700.css'
 import '@fontsource-variable/noto-serif-sc'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react'
 
 import {
     createEssayActivityClient,
@@ -13,6 +20,7 @@ import {
     createDraftRepository,
     createMarkdownPdf,
     DeleteDocumentButton,
+    type DraftDocumentSeed,
     EditorPage,
     ExportMenu,
     getLocalDraftDocumentKey,
@@ -65,6 +73,7 @@ type ActiveDocument =
     | {
         kind: 'published'
         content: string
+        draftSeed: DraftDocumentSeed
         id: string
         isPrivate: boolean
         themeId: number | null
@@ -90,6 +99,70 @@ function sortDrafts(drafts: LocalDraft[]) {
 
 function activateDraft(draft: LocalDraft): ActiveDocument {
     return { kind: 'draft', ...draft }
+}
+
+function activateEssay(essay: EssayListEntry): ActiveDocument {
+    const modified = essay.localContent !== undefined
+    return {
+        kind: 'published',
+        id: essay.id,
+        content: essay.content,
+        draftSeed: modified
+            ? {
+                content: essay.localContent ?? essay.content,
+                isPrivate:
+                    essay.localIsPrivate ?? essay.isPrivate === true,
+                themeId:
+                    essay.localThemeId === undefined
+                        ? essay.themeId
+                        : essay.localThemeId,
+                updatedAt: essay.localUpdatedAt ?? 0,
+            }
+            : {
+                content: essay.content,
+                isPrivate: essay.isPrivate === true,
+                themeId: essay.themeId,
+                updatedAt: 0,
+            },
+        isPrivate: essay.isPrivate === true,
+        themeId: essay.themeId,
+        themeSlug: essay.themeSlug,
+    }
+}
+
+function getDocumentSeed(
+    document: ActiveDocument | null
+): DraftDocumentSeed | undefined {
+    if (!document) {
+        return undefined
+    }
+    if (document.kind === 'published') {
+        return document.draftSeed
+    }
+    return {
+        content: document.content,
+        isPrivate: document.isPrivate === true,
+        themeId: document.themeId,
+        updatedAt: document.updatedAt,
+    }
+}
+
+function getDocumentKey(document: ActiveDocument) {
+    return document.kind === 'published'
+        ? `essay:${document.id}`
+        : getLocalDraftDocumentKey(document.localId)
+}
+
+function getPercentile(samples: number[], percentile: number) {
+    if (samples.length === 0) {
+        return 0
+    }
+    const sorted = [...samples].sort((left, right) => left - right)
+    const index = Math.max(
+        0,
+        Math.ceil((percentile / 100) * sorted.length) - 1
+    )
+    return sorted[index]
 }
 
 function createRecoveryDraft(): LocalDraft {
@@ -128,6 +201,12 @@ function AppContent() {
     const editorRef = useRef<MarkdownEditorHandle>(null)
     const localDraftsRef = useRef<LocalDraft[]>([])
     const pendingPublishRef = useRef<PendingPublish | null>(null)
+    const pendingSwitchMeasureRef = useRef<{
+        key: string
+        startMark: string
+    }>()
+    const switchReadySamplesRef = useRef<number[]>([])
+    const switchMeasureSequenceRef = useRef(0)
 
     const settingsRepository = useMemo(createSettingsRepository, [])
     const draftRepository = useMemo(createDraftRepository, [])
@@ -190,11 +269,7 @@ function AppContent() {
         onLoadError: notifySettingsLoadError,
     })
     const activeDocumentKey =
-        activeDocument?.kind === 'published'
-            ? `essay:${activeDocument.id}`
-            : activeDocument?.kind === 'draft'
-                ? getLocalDraftDocumentKey(activeDocument.localId)
-                : 'loading'
+        activeDocument ? getDocumentKey(activeDocument) : 'loading'
     const draft = useDraftController({
         baselineContent:
             activeDocument?.kind === 'published'
@@ -209,10 +284,72 @@ function AppContent() {
                 ? activeDocument.themeId
                 : null,
         documentKey: activeDocumentKey,
+        enabled: activeDocument !== null,
         persistBaseline: activeDocument?.kind === 'draft',
         repository: draftRepository,
+        seed: getDocumentSeed(activeDocument),
         onError: notifyDraftError,
     })
+
+    useLayoutEffect(() => {
+        const pending = pendingSwitchMeasureRef.current
+        if (
+            !import.meta.env.DEV ||
+            import.meta.env.MODE === 'test' ||
+            !pending ||
+            pending.key !== activeDocumentKey ||
+            typeof performance.mark !== 'function'
+        ) {
+            return
+        }
+        const activeMark = `${pending.startMark}:active`
+        performance.mark(activeMark)
+        const measurement = performance.measure(
+            'essay-switch-to-active',
+            pending.startMark,
+            activeMark
+        )
+        console.debug(
+            `[performance] essay selection committed in ${measurement.duration.toFixed(1)}ms`
+        )
+        performance.clearMarks(activeMark)
+        performance.clearMeasures('essay-switch-to-active')
+    }, [activeDocumentKey])
+
+    const handleEditorReady = useCallback((documentKey: string) => {
+        const pending = pendingSwitchMeasureRef.current
+        if (
+            !import.meta.env.DEV ||
+            import.meta.env.MODE === 'test' ||
+            !pending ||
+            pending.key !== documentKey ||
+            typeof performance.mark !== 'function' ||
+            typeof performance.measure !== 'function'
+        ) {
+            return
+        }
+        const readyMark = `${pending.startMark}:editor-ready`
+        performance.mark(readyMark)
+        const measurement = performance.measure(
+            'essay-switch-to-editor-ready',
+            pending.startMark,
+            readyMark
+        )
+        const samples = switchReadySamplesRef.current
+        samples.push(measurement.duration)
+        if (samples.length > 100) {
+            samples.shift()
+        }
+        console.debug(
+            `[performance] essay switch ready in ${measurement.duration.toFixed(1)}ms ` +
+            `(n=${samples.length}, p50=${getPercentile(samples, 50).toFixed(1)}ms, ` +
+            `p95=${getPercentile(samples, 95).toFixed(1)}ms, ` +
+            `p99=${getPercentile(samples, 99).toFixed(1)}ms)`
+        )
+        performance.clearMarks(readyMark)
+        performance.clearMeasures('essay-switch-to-editor-ready')
+        pendingSwitchMeasureRef.current = undefined
+    }, [])
 
     const notifyActivityError = useCallback(
         (message: string) => {
@@ -299,6 +436,12 @@ function AppContent() {
                         kind: 'published',
                         id,
                         content: publishedDraft.content,
+                        draftSeed: {
+                            content: publishedDraft.content,
+                            isPrivate: publishedDraft.isPrivate,
+                            themeId: publishedDraft.themeId,
+                            updatedAt: 0,
+                        },
                         isPrivate: publishedDraft.isPrivate,
                         themeId: publishedDraft.themeId,
                         themeSlug: publishedDraft.themeSlug,
@@ -415,7 +558,17 @@ function AppContent() {
         }
         const resolvedThemeId = resolveThemeId(activeDocument.themeSlug)
         if (resolvedThemeId !== activeDocument.themeId) {
-            setActiveDocument({ ...activeDocument, themeId: resolvedThemeId })
+            setActiveDocument({
+                ...activeDocument,
+                draftSeed:
+                    activeDocument.draftSeed.updatedAt === 0
+                        ? {
+                            ...activeDocument.draftSeed,
+                            themeId: resolvedThemeId,
+                        }
+                        : activeDocument.draftSeed,
+                themeId: resolvedThemeId,
+            })
         }
     }, [activeDocument, resolveThemeId])
 
@@ -461,6 +614,27 @@ function AppContent() {
             console.error('Failed to show the main window', error)
         })
     }, [])
+
+    useEffect(() => {
+        let unlisten: (() => void) | undefined
+        let cancelled = false
+        void tauriDesktopAdapter
+            .interceptClose(draft.flushAll)
+            .then((nextUnlisten) => {
+                if (cancelled) {
+                    nextUnlisten()
+                } else {
+                    unlisten = nextUnlisten
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to register the close handler', error)
+            })
+        return () => {
+            cancelled = true
+            unlisten?.()
+        }
+    }, [draft.flushAll])
 
     const openSettings = () => {
         setPage('settings')
@@ -554,6 +728,12 @@ function AppContent() {
                 kind: 'published',
                 id: activeDocument.id,
                 content,
+                draftSeed: {
+                    content,
+                    isPrivate: draft.isPrivate,
+                    themeId: draft.themeId,
+                    updatedAt: 0,
+                },
                 isPrivate: draft.isPrivate,
                 themeId: draft.themeId,
                 themeSlug,
@@ -593,14 +773,7 @@ function AppContent() {
 
         const firstEssay = remainingEssays[0]
         if (firstEssay) {
-            setActiveDocument({
-                kind: 'published',
-                id: firstEssay.id,
-                content: firstEssay.content,
-                isPrivate: firstEssay.isPrivate === true,
-                themeId: firstEssay.themeId,
-                themeSlug: firstEssay.themeSlug,
-            })
+            setActiveDocument(activateEssay(firstEssay))
             return
         }
 
@@ -705,7 +878,52 @@ function AppContent() {
         }
     }
 
-    const selectDraft = async (nextDraft: LocalDraft) => {
+    const activateDocument = (nextDocument: ActiveDocument) => {
+        const nextDocumentKey = getDocumentKey(nextDocument)
+        let startMark: string | undefined
+        if (
+            import.meta.env.DEV &&
+            import.meta.env.MODE !== 'test' &&
+            typeof performance.mark === 'function'
+        ) {
+            const sequence = switchMeasureSequenceRef.current + 1
+            switchMeasureSequenceRef.current = sequence
+            startMark = `essay-switch:${sequence}:click`
+            performance.mark(startMark)
+            pendingSwitchMeasureRef.current = {
+                key: nextDocumentKey,
+                startMark,
+            }
+        }
+        const saveTask = activeDocument
+            ? draft.flush()
+            : Promise.resolve(true)
+        setActiveDocument(nextDocument)
+        showEditor()
+        void saveTask.finally(() => {
+            if (
+                !startMark ||
+                typeof performance.mark !== 'function' ||
+                typeof performance.measure !== 'function'
+            ) {
+                return
+            }
+            const saveMark = `${startMark}:save-settled`
+            performance.mark(saveMark)
+            const measurement = performance.measure(
+                'essay-switch-background-save',
+                startMark,
+                saveMark
+            )
+            console.debug(
+                `[performance] previous essay saved in ${measurement.duration.toFixed(1)}ms`
+            )
+            performance.clearMarks(saveMark)
+            performance.clearMeasures('essay-switch-background-save')
+        })
+    }
+
+    const selectDraft = (nextDraft: LocalDraft) => {
         if (
             activeDocument?.kind === 'draft' &&
             activeDocument.localId === nextDraft.localId
@@ -713,14 +931,10 @@ function AppContent() {
             showEditor()
             return
         }
-        if (activeDocument && !(await draft.flush())) {
-            return
-        }
-        setActiveDocument(activateDraft(nextDraft))
-        showEditor()
+        activateDocument(activateDraft(nextDraft))
     }
 
-    const selectEssay = async (essay: EssayListEntry) => {
+    const selectEssay = (essay: EssayListEntry) => {
         if (
             activeDocument?.kind === 'published' &&
             activeDocument.id === essay.id
@@ -728,23 +942,12 @@ function AppContent() {
             showEditor()
             return
         }
-        if (activeDocument && !(await draft.flush())) {
-            return
-        }
-        setActiveDocument({
-            kind: 'published',
-            id: essay.id,
-            content: essay.content,
-            isPrivate: essay.isPrivate === true,
-            themeId: essay.themeId,
-            themeSlug: essay.themeSlug,
-        })
-        showEditor()
+        activateDocument(activateEssay(essay))
     }
 
-    const changeSelectedDate = async (date: string | null) => {
-        if (activeDocument && !(await draft.flush())) {
-            return
+    const changeSelectedDate = (date: string | null) => {
+        if (activeDocument) {
+            void draft.flush()
         }
         setSelectedDate(date)
     }
@@ -810,8 +1013,8 @@ function AppContent() {
             return
         }
         draft.onContentChange(content)
+        const updatedAt = Date.now()
         if (activeDocument.kind === 'draft') {
-            const updatedAt = Date.now()
             setActiveDocument({ ...activeDocument, content, updatedAt })
             setLocalDrafts((current) =>
                 sortDrafts(
@@ -829,6 +1032,7 @@ function AppContent() {
             content,
             draft.isPrivate,
             draft.themeId,
+            updatedAt,
             content !== activeDocument.content ||
                 draft.isPrivate !== activeDocument.isPrivate ||
                 draft.themeId !== activeDocument.themeId
@@ -840,8 +1044,8 @@ function AppContent() {
             return
         }
         draft.onThemeChange(themeId)
+        const updatedAt = Date.now()
         if (activeDocument.kind === 'draft') {
-            const updatedAt = Date.now()
             setActiveDocument({ ...activeDocument, themeId, updatedAt })
             setLocalDrafts((current) =>
                 sortDrafts(
@@ -860,6 +1064,7 @@ function AppContent() {
             content,
             draft.isPrivate,
             themeId,
+            updatedAt,
             content !== activeDocument.content ||
             draft.isPrivate !== activeDocument.isPrivate ||
             themeId !== activeDocument.themeId
@@ -871,8 +1076,8 @@ function AppContent() {
             return
         }
         draft.onPrivateChange(isPrivate)
+        const updatedAt = Date.now()
         if (activeDocument.kind === 'draft') {
-            const updatedAt = Date.now()
             setActiveDocument({...activeDocument, isPrivate, updatedAt})
             setLocalDrafts((current) =>
                 sortDrafts(
@@ -891,6 +1096,7 @@ function AppContent() {
             content,
             isPrivate,
             draft.themeId,
+            updatedAt,
             content !== activeDocument.content ||
                 isPrivate !== activeDocument.isPrivate ||
                 draft.themeId !== activeDocument.themeId
@@ -1085,12 +1291,13 @@ function AppContent() {
                 active={page === 'editor'}
                 actionLabel={actionLabel}
                 backupTimestamp={draft.updatedAt}
+                content={draft.content}
                 disabled={publishing.loading || updating || deleting}
-                editorKey={activeDocumentKey}
-                initialContent={draft.initialContent}
+                documentKey={activeDocumentKey}
                 isPrivate={draft.isPrivate}
                 loading={publishing.loading || updating}
                 onContentChange={handleContentChange}
+                onEditorReady={handleEditorReady}
                 onPrivateChange={handlePrivateChange}
                 onPublish={() => void saveDocument()}
                 publishReady={Boolean(

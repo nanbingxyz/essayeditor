@@ -24,6 +24,7 @@ export interface EssayListEntry extends EssayListItem {
     localContent?: string
     localIsPrivate?: boolean
     localThemeId?: number | null
+    localUpdatedAt?: number
     themeId: number | null
 }
 
@@ -174,6 +175,7 @@ export function useEssayLibraryController({
                         localContent: draft.content,
                         localIsPrivate,
                         localThemeId,
+                        localUpdatedAt: draft.updatedAt,
                     }
                 })
             ),
@@ -503,6 +505,7 @@ export function useEssayLibraryController({
             localContent: string,
             localIsPrivate: boolean,
             localThemeId: number | null,
+            localUpdatedAt: number,
             modified: boolean
         ) => {
             const nextEntries = entriesRef.current.map((entry) =>
@@ -515,6 +518,9 @@ export function useEssayLibraryController({
                               : undefined,
                           localThemeId: modified
                               ? localThemeId
+                              : undefined,
+                          localUpdatedAt: modified
+                              ? localUpdatedAt
                               : undefined,
                       }
                     : entry

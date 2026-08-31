@@ -1,29 +1,84 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
-
-import {debounce} from '@/shared/lib/timing'
+import {useCallback, useEffect, useRef, useState} from 'react'
 
 import type {DraftRepository, DraftSnapshot} from './draft-repository'
 
 const DRAFT_SAVE_DELAY = 1000
+
+export interface DraftDocumentSeed {
+    content: string
+    isPrivate: boolean
+    themeId: number | null
+    updatedAt: number
+}
 
 interface DraftControllerOptions {
     baselineContent: string
     baselineIsPrivate?: boolean
     baselineThemeId?: number | null
     documentKey: string
+    enabled?: boolean
     onError: () => void
     persistBaseline?: boolean
     repository: DraftRepository
+    seed?: DraftDocumentSeed
 }
 
-interface PendingSave {
+interface DraftSession extends DraftDocumentSeed {
     baselineContent: string
     baselineIsPrivate: boolean
     baselineThemeId: number | null
-    content: string
+    dirty: boolean
     documentKey: string
-    isPrivate: boolean
-    themeId: number | null
+    enqueuedRevision: number
+    identity: string
+    initialContent: string
+    loading: boolean
+    pendingSave?: Promise<boolean>
+    persistBaseline: boolean
+    ready: boolean
+    revision: number
+    saveTimer?: ReturnType<typeof setTimeout>
+}
+
+function createSession({
+    baselineContent,
+    baselineIsPrivate,
+    baselineThemeId,
+    documentKey,
+    identity,
+    persistBaseline,
+    seed,
+}: {
+    baselineContent: string
+    baselineIsPrivate: boolean
+    baselineThemeId: number | null
+    documentKey: string
+    identity: string
+    persistBaseline: boolean
+    seed?: DraftDocumentSeed
+}): DraftSession {
+    const initial = seed ?? {
+        content: baselineContent,
+        isPrivate: baselineIsPrivate,
+        themeId: baselineThemeId,
+        updatedAt: 0,
+    }
+
+    return {
+        ...initial,
+        baselineContent,
+        baselineIsPrivate,
+        baselineThemeId,
+        dirty: false,
+        documentKey,
+        enqueuedRevision: -1,
+        identity,
+        initialContent: initial.content,
+        loading: false,
+        persistBaseline,
+        ready: seed !== undefined,
+        revision: 0,
+    }
 }
 
 export function useDraftController({
@@ -31,335 +86,308 @@ export function useDraftController({
     baselineIsPrivate = false,
     baselineThemeId = null,
     documentKey,
+    enabled = true,
     onError,
     persistBaseline = false,
     repository,
+    seed,
 }: DraftControllerOptions) {
-    const [content, setContent] = useState('')
-    const [initialContent, setInitialContent] = useState('')
-    const [isPrivate, setIsPrivate] = useState(false)
-    const [themeId, setThemeId] = useState<number | null>(null)
-    const [loadedIdentity, setLoadedIdentity] = useState('')
-    const [updatedAt, setUpdatedAt] = useState(0)
-    const [ready, setReady] = useState(false)
-
-    const onErrorRef = useRef(onError)
-    const baselineContentRef = useRef(baselineContent)
-    const baselineIsPrivateRef = useRef(baselineIsPrivate)
-    const baselineThemeIdRef = useRef(baselineThemeId)
-    const documentKeyRef = useRef(documentKey)
-    const latestContentRef = useRef('')
-    const latestIsPrivateRef = useRef(false)
-    const latestThemeIdRef = useRef<number | null>(null)
-    const persistedContentRef = useRef('')
-    const persistedIsPrivateRef = useRef(false)
-    const persistedThemeIdRef = useRef<number | null>(null)
+    const [, setRenderVersion] = useState(0)
+    const sessionsRef = useRef(new Map<string, DraftSession>())
+    const activeSessionRef = useRef<DraftSession>()
     const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true))
-    const needsSaveRef = useRef(false)
-    const pendingSaveRef = useRef<PendingSave | null>(null)
+    const mountedRef = useRef(true)
+    const onErrorRef = useRef(onError)
 
     onErrorRef.current = onError
-    const documentIdentity = `${documentKey}\u0000${baselineContent}\u0000${baselineThemeId ?? ''}\u0000${baselineIsPrivate}`
-
-    const enqueueSave = useCallback(
-        ({
+    const documentIdentity = `${documentKey}\u0000${baselineContent}\u0000${baselineThemeId ?? ''}\u0000${baselineIsPrivate}\u0000${persistBaseline}`
+    let session = sessionsRef.current.get(documentIdentity)
+    if (!session) {
+        session = createSession({
             baselineContent,
             baselineIsPrivate,
             baselineThemeId,
-            content,
             documentKey,
-            isPrivate,
-            themeId,
-        }: PendingSave) => {
-            const pending = {
-                baselineContent,
-                baselineIsPrivate,
-                baselineThemeId,
-                content,
-                documentKey,
-                isPrivate,
-                themeId,
+            identity: documentIdentity,
+            persistBaseline,
+            seed,
+        })
+        sessionsRef.current.set(documentIdentity, session)
+    }
+    const activeSession = session as DraftSession
+    activeSessionRef.current = activeSession
+
+    const renderIfActive = useCallback((target: DraftSession) => {
+        if (mountedRef.current && activeSessionRef.current === target) {
+            setRenderVersion((current) => current + 1)
+        }
+    }, [])
+
+    const enqueueSave = useCallback(
+        (target: DraftSession) => {
+            if (target.saveTimer !== undefined) {
+                clearTimeout(target.saveTimer)
+                target.saveTimer = undefined
             }
-            pendingSaveRef.current = pending
+
+            if (!target.dirty) {
+                return target.pendingSave ?? Promise.resolve(true)
+            }
+            if (
+                target.pendingSave &&
+                target.enqueuedRevision === target.revision
+            ) {
+                return target.pendingSave
+            }
+
+            const revision = target.revision
             const timestamp = Date.now()
             const snapshot: DraftSnapshot = {
                 version: 2,
-                content,
-                isPrivate,
-                themeId,
+                content: target.content,
+                isPrivate: target.isPrivate,
+                themeId: target.themeId,
                 updatedAt: timestamp,
             }
+            target.enqueuedRevision = revision
 
             const task = saveQueueRef.current.then(async () => {
                 try {
                     if (
-                        content === baselineContent &&
-                        isPrivate === baselineIsPrivate &&
-                        themeId === baselineThemeId &&
-                        !persistBaseline
+                        snapshot.content === target.baselineContent &&
+                        snapshot.isPrivate === target.baselineIsPrivate &&
+                        snapshot.themeId === target.baselineThemeId &&
+                        !target.persistBaseline
                     ) {
-                        await repository.clear(documentKey)
+                        await repository.clear(target.documentKey)
                     } else {
-                        await repository.save(documentKey, snapshot)
+                        await repository.save(target.documentKey, snapshot)
                     }
 
-                    if (
-                        documentKey === documentKeyRef.current &&
-                        content === latestContentRef.current &&
-                        isPrivate === latestIsPrivateRef.current &&
-                        themeId === latestThemeIdRef.current
-                    ) {
-                        persistedContentRef.current = content
-                        persistedIsPrivateRef.current = isPrivate
-                        persistedThemeIdRef.current = themeId
-                        needsSaveRef.current = false
-                        setUpdatedAt(
-                            content === baselineContent &&
-                                isPrivate === baselineIsPrivate &&
-                                themeId === baselineThemeId &&
-                                !persistBaseline
-                                ? 0
-                                : timestamp
-                        )
+                    if (target.revision === revision) {
+                        target.dirty = false
                     }
-                    if (pendingSaveRef.current === pending) {
-                        pendingSaveRef.current = null
-                    }
+                    target.updatedAt =
+                        snapshot.content === target.baselineContent &&
+                        snapshot.isPrivate === target.baselineIsPrivate &&
+                        snapshot.themeId === target.baselineThemeId &&
+                        !target.persistBaseline
+                            ? 0
+                            : timestamp
+                    renderIfActive(target)
                     return true
                 } catch {
-                    if (documentKey === documentKeyRef.current) {
-                        needsSaveRef.current = true
-                        onErrorRef.current()
-                    }
-                    if (pendingSaveRef.current === pending) {
-                        pendingSaveRef.current = null
-                    }
+                    target.dirty = true
+                    onErrorRef.current()
+                    renderIfActive(target)
                     return false
+                } finally {
+                    if (target.enqueuedRevision === revision) {
+                        target.enqueuedRevision = -1
+                    }
+                    if (target.pendingSave === task) {
+                        target.pendingSave = undefined
+                    }
                 }
             })
 
+            target.pendingSave = task
             saveQueueRef.current = task
             return task
         },
-        [persistBaseline, repository]
+        [renderIfActive, repository]
     )
 
-    const scheduleSave = useMemo(
-        () =>
-            debounce(
-                (pending: PendingSave) => void enqueueSave(pending),
-                DRAFT_SAVE_DELAY
-            ),
+    const scheduleSave = useCallback(
+        (target: DraftSession) => {
+            if (target.saveTimer !== undefined) {
+                clearTimeout(target.saveTimer)
+            }
+            target.saveTimer = setTimeout(() => {
+                target.saveTimer = undefined
+                void enqueueSave(target)
+            }, DRAFT_SAVE_DELAY)
+        },
         [enqueueSave]
+    )
+
+    const updateSession = useCallback(
+        (
+            target: DraftSession,
+            update: Partial<
+                Pick<DraftSession, 'content' | 'isPrivate' | 'themeId'>
+            >
+        ) => {
+            Object.assign(target, update)
+            target.dirty = true
+            target.revision += 1
+            scheduleSave(target)
+            renderIfActive(target)
+        },
+        [renderIfActive, scheduleSave]
     )
 
     const onContentChange = useCallback(
         (content: string) => {
-            latestContentRef.current = content
-            needsSaveRef.current = true
-            setContent(content)
-            scheduleSave({
-                baselineContent: baselineContentRef.current,
-                baselineIsPrivate: baselineIsPrivateRef.current,
-                baselineThemeId: baselineThemeIdRef.current,
-                content,
-                documentKey: documentKeyRef.current,
-                isPrivate: latestIsPrivateRef.current,
-                themeId: latestThemeIdRef.current,
-            })
+            const target = activeSessionRef.current
+            if (target) {
+                updateSession(target, {content})
+            }
         },
-        [scheduleSave]
+        [updateSession]
     )
 
     const onThemeChange = useCallback(
-        (nextThemeId: number | null) => {
-            latestThemeIdRef.current = nextThemeId
-            needsSaveRef.current = true
-            setThemeId(nextThemeId)
-            scheduleSave({
-                baselineContent: baselineContentRef.current,
-                baselineIsPrivate: baselineIsPrivateRef.current,
-                baselineThemeId: baselineThemeIdRef.current,
-                content: latestContentRef.current,
-                documentKey: documentKeyRef.current,
-                isPrivate: latestIsPrivateRef.current,
-                themeId: nextThemeId,
-            })
+        (themeId: number | null) => {
+            const target = activeSessionRef.current
+            if (target) {
+                updateSession(target, {themeId})
+            }
         },
-        [scheduleSave]
+        [updateSession]
     )
 
     const onPrivateChange = useCallback(
-        (nextIsPrivate: boolean) => {
-            latestIsPrivateRef.current = nextIsPrivate
-            needsSaveRef.current = true
-            setIsPrivate(nextIsPrivate)
-            scheduleSave({
-                baselineContent: baselineContentRef.current,
-                baselineIsPrivate: baselineIsPrivateRef.current,
-                baselineThemeId: baselineThemeIdRef.current,
-                content: latestContentRef.current,
-                documentKey: documentKeyRef.current,
-                isPrivate: nextIsPrivate,
-                themeId: latestThemeIdRef.current,
-            })
+        (isPrivate: boolean) => {
+            const target = activeSessionRef.current
+            if (target) {
+                updateSession(target, {isPrivate})
+            }
         },
-        [scheduleSave]
+        [updateSession]
     )
 
-    const flush = useCallback(async () => {
-        scheduleSave.cancel()
-        if (needsSaveRef.current) {
-            const pending = pendingSaveRef.current
-            if (
-                pending?.documentKey === documentKeyRef.current &&
-                pending.content === latestContentRef.current &&
-                pending.baselineContent === baselineContentRef.current &&
-                pending.isPrivate === latestIsPrivateRef.current &&
-                pending.baselineIsPrivate === baselineIsPrivateRef.current &&
-                pending.themeId === latestThemeIdRef.current &&
-                pending.baselineThemeId === baselineThemeIdRef.current
-            ) {
-                return saveQueueRef.current
-            }
-            return enqueueSave({
-                baselineContent: baselineContentRef.current,
-                baselineIsPrivate: baselineIsPrivateRef.current,
-                baselineThemeId: baselineThemeIdRef.current,
-                content: latestContentRef.current,
-                documentKey: documentKeyRef.current,
-                isPrivate: latestIsPrivateRef.current,
-                themeId: latestThemeIdRef.current,
-            })
-        }
-        return saveQueueRef.current
-    }, [enqueueSave, scheduleSave])
+    const flush = useCallback(() => {
+        const target = activeSessionRef.current
+        return target ? enqueueSave(target) : Promise.resolve(true)
+    }, [enqueueSave])
 
-    const clear = useCallback(async (notifyError = true) => {
-        scheduleSave.cancel()
-        try {
-            await repository.clear(documentKeyRef.current)
-            persistedContentRef.current = baselineContentRef.current
-            persistedIsPrivateRef.current = baselineIsPrivateRef.current
-            persistedThemeIdRef.current = baselineThemeIdRef.current
-            needsSaveRef.current = false
-            setUpdatedAt(0)
+    const flushAll = useCallback(async () => {
+        const saves = [...sessionsRef.current.values()]
+            .filter((target) => target.dirty || target.pendingSave)
+            .map((target) => enqueueSave(target))
+        if (saves.length === 0) {
             return true
-        } catch {
-            if (notifyError) {
-                onErrorRef.current()
-            }
-            return false
         }
-    }, [repository, scheduleSave])
+        const results = await Promise.all(saves)
+        return results.every(Boolean)
+    }, [enqueueSave])
+
+    const clear = useCallback(
+        async (notifyError = true) => {
+            const target = activeSessionRef.current
+            if (!target) {
+                return true
+            }
+            if (target.saveTimer !== undefined) {
+                clearTimeout(target.saveTimer)
+                target.saveTimer = undefined
+            }
+            if (target.pendingSave) {
+                await target.pendingSave
+            }
+            try {
+                await repository.clear(target.documentKey)
+                target.content = target.baselineContent
+                target.initialContent = target.baselineContent
+                target.isPrivate = target.baselineIsPrivate
+                target.themeId = target.baselineThemeId
+                target.updatedAt = 0
+                target.dirty = false
+                target.revision += 1
+                renderIfActive(target)
+                return true
+            } catch {
+                if (notifyError) {
+                    onErrorRef.current()
+                }
+                return false
+            }
+        },
+        [renderIfActive, repository]
+    )
 
     useEffect(() => {
-        let cancelled = false
-        documentKeyRef.current = documentKey
-        baselineContentRef.current = baselineContent
-        baselineIsPrivateRef.current = baselineIsPrivate
-        baselineThemeIdRef.current = baselineThemeId
-        latestContentRef.current = baselineContent
-        latestIsPrivateRef.current = baselineIsPrivate
-        latestThemeIdRef.current = baselineThemeId
-        persistedContentRef.current = baselineContent
-        persistedIsPrivateRef.current = baselineIsPrivate
-        persistedThemeIdRef.current = baselineThemeId
-        needsSaveRef.current = false
-        pendingSaveRef.current = null
-        scheduleSave.cancel()
-        setReady(false)
+        const target = activeSession
+        if (!enabled || target.ready || target.loading) {
+            return
+        }
+        target.loading = true
 
         void repository
-            .load(documentKey)
+            .load(target.documentKey)
             .then((draft) => {
-                if (cancelled) {
+                if (target.revision !== 0) {
                     return
                 }
-                const effectiveContent = draft?.content ?? baselineContent
-                const effectiveIsPrivate = draft
+                target.content = draft?.content ?? target.baselineContent
+                target.initialContent = target.content
+                target.isPrivate = draft
                     ? draft.isPrivate === true
-                    : baselineIsPrivate
-                const effectiveThemeId = draft
+                    : target.baselineIsPrivate
+                target.themeId = draft
                     ? draft.themeId
-                    : baselineThemeId
-                latestContentRef.current = effectiveContent
-                latestIsPrivateRef.current = effectiveIsPrivate
-                latestThemeIdRef.current = effectiveThemeId
-                persistedContentRef.current = effectiveContent
-                persistedIsPrivateRef.current = effectiveIsPrivate
-                persistedThemeIdRef.current = effectiveThemeId
-                setContent(effectiveContent)
-                setInitialContent(effectiveContent)
-                setIsPrivate(effectiveIsPrivate)
-                setThemeId(effectiveThemeId)
-                setUpdatedAt(
+                    : target.baselineThemeId
+                target.updatedAt =
                     draft &&
-                        (persistBaseline ||
-                            draft.content !== baselineContent ||
-                            effectiveIsPrivate !== baselineIsPrivate ||
-                            effectiveThemeId !== baselineThemeId)
+                    (target.persistBaseline ||
+                        draft.content !== target.baselineContent ||
+                        target.isPrivate !== target.baselineIsPrivate ||
+                        target.themeId !== target.baselineThemeId)
                         ? draft.updatedAt
                         : 0
-                )
                 if (
-                    draft?.content === baselineContent &&
-                    effectiveIsPrivate === baselineIsPrivate &&
-                    effectiveThemeId === baselineThemeId &&
-                    !persistBaseline
+                    draft?.content === target.baselineContent &&
+                    target.isPrivate === target.baselineIsPrivate &&
+                    target.themeId === target.baselineThemeId &&
+                    !target.persistBaseline
                 ) {
-                    void repository.clear(documentKey).catch(() => undefined)
+                    void repository
+                        .clear(target.documentKey)
+                        .catch(() => undefined)
                 }
             })
             .catch(() => {
-                if (!cancelled) {
-                    latestContentRef.current = baselineContent
-                    persistedContentRef.current = baselineContent
-                    latestIsPrivateRef.current = baselineIsPrivate
-                    persistedIsPrivateRef.current = baselineIsPrivate
-                    latestThemeIdRef.current = baselineThemeId
-                    persistedThemeIdRef.current = baselineThemeId
-                    setContent(baselineContent)
-                    setInitialContent(baselineContent)
-                    setIsPrivate(baselineIsPrivate)
-                    setThemeId(baselineThemeId)
-                    setUpdatedAt(0)
+                if (target.revision === 0) {
+                    target.content = target.baselineContent
+                    target.initialContent = target.baselineContent
+                    target.isPrivate = target.baselineIsPrivate
+                    target.themeId = target.baselineThemeId
+                    target.updatedAt = 0
                     onErrorRef.current()
                 }
             })
             .finally(() => {
-                if (!cancelled) {
-                    setLoadedIdentity(documentIdentity)
-                    setReady(true)
+                target.loading = false
+                target.ready = true
+                renderIfActive(target)
+            })
+    }, [activeSession, documentIdentity, enabled, renderIfActive, repository])
+
+    useEffect(() => {
+        mountedRef.current = true
+        return () => {
+            mountedRef.current = false
+            sessionsRef.current.forEach((target) => {
+                if (target.saveTimer !== undefined) {
+                    clearTimeout(target.saveTimer)
                 }
             })
-
-        return () => {
-            cancelled = true
-            scheduleSave.cancel()
         }
-    }, [
-        baselineContent,
-        baselineIsPrivate,
-        baselineThemeId,
-        documentIdentity,
-        documentKey,
-        persistBaseline,
-        repository,
-        scheduleSave,
-    ])
+    }, [])
 
     return {
         clear,
-        content,
+        content: activeSession.content,
         flush,
-        initialContent,
-        isPrivate,
+        flushAll,
+        initialContent: activeSession.initialContent,
+        isPrivate: activeSession.isPrivate,
         onContentChange,
         onPrivateChange,
         onThemeChange,
-        ready: ready && loadedIdentity === documentIdentity,
-        themeId,
-        updatedAt,
+        ready: activeSession.ready,
+        themeId: activeSession.themeId,
+        updatedAt: activeSession.updatedAt,
     }
 }

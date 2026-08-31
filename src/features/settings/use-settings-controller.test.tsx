@@ -69,6 +69,7 @@ describe('useSettingsController', () => {
         const desktop: DesktopAdapter = {
             exportMarkdown: vi.fn(async () => false),
             exportPdf: vi.fn(async () => false),
+            interceptClose: vi.fn(async () => () => undefined),
             openExternal: vi.fn(async () => undefined),
             setWindowAppearance: vi.fn(async () => undefined),
             showMainWindow: vi.fn(async () => undefined),
@@ -111,6 +112,7 @@ describe('useSettingsController', () => {
         const desktop: DesktopAdapter = {
             exportMarkdown: vi.fn(async () => false),
             exportPdf: vi.fn(async () => false),
+            interceptClose: vi.fn(async () => () => undefined),
             openExternal: vi.fn(async () => undefined),
             setWindowAppearance: vi.fn(async () => undefined),
             showMainWindow: vi.fn(async () => undefined),

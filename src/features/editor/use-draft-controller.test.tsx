@@ -223,4 +223,137 @@ describe('useDraftController', () => {
         )
     })
 
+    it('keeps rapid document switches isolated by document key', async () => {
+        const repository: DraftRepository = {
+            ...localDraftMethods(),
+            clear: vi.fn(async () => undefined),
+            load: vi.fn(async () => null),
+            save: vi.fn(async () => undefined),
+        }
+        const container = document.createElement('div')
+        document.body.append(container)
+        const root = createRoot(container)
+        roots.push(root)
+        let controller: DraftController | undefined
+
+        function Harness({
+            content,
+            documentKey,
+        }: {
+            content: string
+            documentKey: string
+        }) {
+            controller = useDraftController({
+                baselineContent: '',
+                documentKey,
+                persistBaseline: true,
+                repository,
+                seed: {
+                    content,
+                    isPrivate: false,
+                    themeId: null,
+                    updatedAt: 1,
+                },
+                onError: vi.fn(),
+            })
+            return null
+        }
+
+        const renderDocument = (documentKey: string, content: string) => {
+            act(() => root.render(
+                <Harness documentKey={documentKey} content={content} />
+            ))
+        }
+        renderDocument('local:a', 'A')
+        act(() => {
+            controller?.onContentChange('A edited')
+            void controller?.flush()
+        })
+        renderDocument('local:b', 'B')
+        act(() => {
+            controller?.onContentChange('B edited')
+            void controller?.flush()
+        })
+        renderDocument('local:c', 'C')
+        act(() => {
+            controller?.onContentChange('C edited')
+            void controller?.flush()
+        })
+        renderDocument('local:a', 'A')
+
+        expect(controller?.content).toBe('A edited')
+        await act(async () => Promise.resolve())
+        await act(async () => Promise.resolve())
+        expect(repository.save).toHaveBeenNthCalledWith(
+            1,
+            'local:a',
+            expect.objectContaining({content: 'A edited'})
+        )
+        expect(repository.save).toHaveBeenNthCalledWith(
+            2,
+            'local:b',
+            expect.objectContaining({content: 'B edited'})
+        )
+        expect(repository.save).toHaveBeenNthCalledWith(
+            3,
+            'local:c',
+            expect.objectContaining({content: 'C edited'})
+        )
+    })
+
+    it('retains a failed snapshot and retries it on the next flush', async () => {
+        const onError = vi.fn()
+        const repository: DraftRepository = {
+            ...localDraftMethods(),
+            clear: vi.fn(async () => undefined),
+            load: vi.fn(async () => null),
+            save: vi
+                .fn()
+                .mockRejectedValueOnce(new Error('disk unavailable'))
+                .mockResolvedValue(undefined),
+        }
+        const container = document.createElement('div')
+        document.body.append(container)
+        const root = createRoot(container)
+        roots.push(root)
+        let controller: DraftController | undefined
+
+        function Harness() {
+            controller = useDraftController({
+                baselineContent: '',
+                documentKey: 'local:retry',
+                persistBaseline: true,
+                repository,
+                seed: {
+                    content: 'Original',
+                    isPrivate: false,
+                    themeId: null,
+                    updatedAt: 1,
+                },
+                onError,
+            })
+            return null
+        }
+
+        act(() => root.render(<Harness />))
+        act(() => controller?.onContentChange('Keep me'))
+        let firstResult = true
+        await act(async () => {
+            firstResult = (await controller?.flush()) ?? true
+        })
+        expect(firstResult).toBe(false)
+        expect(onError).toHaveBeenCalledOnce()
+
+        let retryResult = false
+        await act(async () => {
+            retryResult = (await controller?.flush()) ?? false
+        })
+        expect(retryResult).toBe(true)
+        expect(repository.save).toHaveBeenCalledTimes(2)
+        expect(repository.save).toHaveBeenLastCalledWith(
+            'local:retry',
+            expect.objectContaining({content: 'Keep me'})
+        )
+    })
+
 })

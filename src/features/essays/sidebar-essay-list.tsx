@@ -2,6 +2,7 @@ import {
     type CSSProperties,
     type MouseEvent as ReactMouseEvent,
     type PointerEvent as ReactPointerEvent,
+    memo,
     useCallback,
     useEffect,
     useRef,
@@ -95,6 +96,67 @@ function EssaySkeleton({ count }: { count: number }) {
     )
 }
 
+const DraftEssayItem = memo(function DraftEssayItem({
+    active,
+    draft,
+    onSelect,
+}: {
+    active: boolean
+    draft: LocalDraft
+    onSelect: (draft: LocalDraft) => void
+}) {
+    const documentId = getLocalDraftDocumentKey(draft.localId)
+    const summary = markdownToSummary(draft.content)
+    return (
+        <button
+            type="button"
+            data-document-id={documentId}
+            className={`essay-index-item essay-new-item ${active ? 'is-active' : ''}`}
+            aria-current={active ? 'page' : undefined}
+            aria-label={`草稿，${summary}`}
+            onClick={() => onSelect(draft)}
+        >
+            <span className="essay-index-label">草稿</span>
+            {draft.content.trim() && (
+                <span className="essay-index-preview">{summary}</span>
+            )}
+        </button>
+    )
+})
+
+const PublishedEssayItem = memo(function PublishedEssayItem({
+    active,
+    essay,
+    onSelect,
+}: {
+    active: boolean
+    essay: EssayListEntry
+    onSelect: (essay: EssayListEntry) => void
+}) {
+    const modified = essay.localContent !== undefined
+    const preview = essay.localContent ?? essay.content
+    const summary = markdownToSummary(preview)
+    return (
+        <button
+            type="button"
+            data-document-id={`essay:${essay.id}`}
+            className={`essay-index-item ${active ? 'is-active' : ''}`}
+            aria-current={active ? 'page' : undefined}
+            aria-label={`${summary}${modified ? '，有本地更改' : ''}`}
+            onClick={() => onSelect(essay)}
+        >
+            <span className="essay-index-preview">{summary}</span>
+            {modified && (
+                <span
+                    className="essay-modified-marker"
+                    title="有本地更改"
+                    aria-hidden="true"
+                />
+            )}
+        </button>
+    )
+})
+
 export default function SidebarEssayList({
     activeDocumentId,
     drafts,
@@ -119,11 +181,23 @@ export default function SidebarEssayList({
     const pointerIdRef = useRef<number | null>(null)
     const pullDistanceRef = useRef(0)
     const refreshObservedRef = useRef(false)
+    const onSelectDraftRef = useRef(onSelectDraft)
+    const onSelectEssayRef = useRef(onSelectEssay)
     const startYRef = useRef<number | null>(null)
     const suppressClickRef = useRef(false)
     const touchStartYRef = useRef<number | null>(null)
     const [pullDistance, setPullDistanceState] = useState(0)
     const [refreshRequested, setRefreshRequested] = useState(false)
+    onSelectDraftRef.current = onSelectDraft
+    onSelectEssayRef.current = onSelectEssay
+    const selectDraftItem = useCallback(
+        (draft: LocalDraft) => onSelectDraftRef.current(draft),
+        []
+    )
+    const selectEssayItem = useCallback(
+        (essay: EssayListEntry) => onSelectEssayRef.current(essay),
+        []
+    )
     const refreshActive = refreshing || refreshRequested
     const refreshBlocked =
         refreshActive || refreshDisabled || loading || loadingMore
@@ -383,27 +457,13 @@ export default function SidebarEssayList({
                         const documentId = getLocalDraftDocumentKey(
                             draft.localId
                         )
-                        const active = documentId === activeDocumentId
                         return (
-                            <button
-                                type="button"
+                            <DraftEssayItem
                                 key={draft.localId}
-                                data-document-id={documentId}
-                                className={`essay-index-item essay-new-item ${active ? 'is-active' : ''
-                                    }`}
-                                aria-current={active ? 'page' : undefined}
-                                aria-label={`草稿，${markdownToSummary(
-                                    draft.content
-                                )}`}
-                                onClick={() => onSelectDraft(draft)}
-                            >
-                                <span className="essay-index-label">草稿</span>
-                                {draft.content.trim() && (
-                                    <span className="essay-index-preview">
-                                        {markdownToSummary(draft.content)}
-                                    </span>
-                                )}
-                            </button>
+                                active={documentId === activeDocumentId}
+                                draft={draft}
+                                onSelect={selectDraftItem}
+                            />
                         )
                     })}
 
@@ -424,33 +484,15 @@ export default function SidebarEssayList({
                         </div>
                     ) : (
                         entries.map((essay) => {
-                            const modified = essay.localContent !== undefined
-                            const preview = essay.localContent ?? essay.content
-                            const active =
-                                `essay:${essay.id}` === activeDocumentId
                             return (
-                                <button
-                                    type="button"
+                                <PublishedEssayItem
                                     key={essay.id}
-                                    data-document-id={`essay:${essay.id}`}
-                                    className={`essay-index-item ${active ? 'is-active' : ''
-                                        }`}
-                                    aria-current={active ? 'page' : undefined}
-                                    aria-label={`${markdownToSummary(preview)}${modified ? '，有本地更改' : ''
-                                        }`}
-                                    onClick={() => onSelectEssay(essay)}
-                                >
-                                    <span className="essay-index-preview">
-                                        {markdownToSummary(preview)}
-                                    </span>
-                                    {modified && (
-                                        <span
-                                            className="essay-modified-marker"
-                                            title="有本地更改"
-                                            aria-hidden="true"
-                                        />
-                                    )}
-                                </button>
+                                    active={
+                                        `essay:${essay.id}` === activeDocumentId
+                                    }
+                                    essay={essay}
+                                    onSelect={selectEssayItem}
+                                />
                             )
                         })
                     )}

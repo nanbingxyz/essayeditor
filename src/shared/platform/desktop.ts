@@ -14,6 +14,9 @@ export interface DesktopAdapter {
         defaultFileName: string
     ) => Promise<boolean>
     openExternal: (url: string) => Promise<void>
+    interceptClose: (
+        flushBeforeClose: () => Promise<boolean>
+    ) => Promise<() => void>
     setWindowAppearance: (appearance: WindowAppearance) => Promise<void>
     showMainWindow: () => Promise<void>
 }
@@ -27,6 +30,28 @@ export const tauriDesktopAdapter: DesktopAdapter = {
             defaultFileName,
         }),
     openExternal: open,
+    interceptClose: async (flushBeforeClose) => {
+        const window = getCurrentWindow()
+        let closing = false
+        return window.onCloseRequested(async (event) => {
+            event.preventDefault()
+            if (closing) {
+                return
+            }
+            closing = true
+            const saved = await flushBeforeClose().catch(() => false)
+            if (!saved) {
+                closing = false
+                return
+            }
+            try {
+                await window.destroy()
+            } catch (error) {
+                closing = false
+                throw error
+            }
+        })
+    },
     setWindowAppearance: async (appearance) => {
         await invoke('set_macos_window_appearance', {appearance})
         await getCurrentWindow().setTheme(
