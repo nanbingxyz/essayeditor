@@ -1,6 +1,7 @@
 import {StrictMode} from 'react'
 import {createRoot, type Root} from 'react-dom/client'
 import {act} from 'react-dom/test-utils'
+import {EditorView} from '@codemirror/view'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 
 import {Toaster} from '@/shared/ui'
@@ -157,7 +158,7 @@ describe('App navigation', () => {
         act(() => (settingsButton as HTMLButtonElement).click())
         expect(container.querySelector('.settings-page-container')?.className)
             .not.toContain('is-page-hidden')
-        expect(container.textContent).toContain('Essay Editor 的本地设置')
+        expect(container.textContent).toContain('Essay Editor 本地设置')
 
         const backButton = container.querySelector(
             'button[aria-label="返回编辑器"]'
@@ -174,10 +175,20 @@ describe('App navigation', () => {
         const publishButton = container.querySelector(
             'button[aria-label="发布文章"]'
         ) as HTMLButtonElement
-        expect(publishButton.disabled).toBe(false)
+        expect(publishButton.disabled).toBe(true)
         expect(
             container.querySelector('button[aria-label="打开已发布文章"]')
         ).toBeNull()
+
+        const editor = EditorView.findFromDOM(
+            container.querySelector('.cm-content') as HTMLElement
+        )
+        if (!editor) {
+            throw new Error('Article editor was not mounted')
+        }
+        act(() => editor.dispatch({changes: {from: 0, insert: 'Publish me'}}))
+        expect(publishButton.disabled).toBe(false)
+
         act(() => publishButton.click())
         expect(container.querySelector('.settings-page-container')?.className)
             .not.toContain('is-page-hidden')
@@ -688,6 +699,38 @@ describe('App navigation', () => {
                 .querySelector('button[aria-label="仅自己可见"]')
                 ?.getAttribute('aria-pressed')
         ).toBe('true')
+
+        const editor = EditorView.findFromDOM(
+            container.querySelector('.cm-content') as HTMLElement
+        )
+        if (!editor) {
+            throw new Error('Article editor was not mounted')
+        }
+        act(() =>
+            editor.dispatch({
+                changes: {
+                    from: 0,
+                    to: editor.state.doc.length,
+                    insert: '   ',
+                },
+            })
+        )
+        expect(
+            (
+                container.querySelector(
+                    'button[aria-label="更新文章"]'
+                ) as HTMLButtonElement
+            ).disabled
+        ).toBe(true)
+        act(() =>
+            editor.dispatch({
+                changes: {
+                    from: 0,
+                    to: editor.state.doc.length,
+                    insert: 'Published with theme',
+                },
+            })
+        )
 
         act(() =>
             (

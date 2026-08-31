@@ -67,6 +67,66 @@ afterEach(() => {
 })
 
 describe('NoteSidebar', () => {
+    it('disables sending empty content when creating and editing notes', async () => {
+        const {container} = renderSidebar()
+        act(() =>
+            (
+                container.querySelector(
+                    'button[aria-label="添加笔记"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => Promise.resolve())
+
+        expect(
+            (
+                document.body.querySelector(
+                    '.note-editor-dialog button[aria-label="添加笔记"]'
+                ) as HTMLButtonElement
+            ).disabled
+        ).toBe(true)
+
+        act(() =>
+            (
+                document.body.querySelector(
+                    '.note-editor-dialog > button'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        act(() =>
+            (container.querySelector('.note-card') as HTMLButtonElement).click()
+        )
+        act(() =>
+            (
+                document.body.querySelector(
+                    'button[aria-label="编辑笔记"]'
+                ) as HTMLButtonElement
+            ).click()
+        )
+        await act(async () => Promise.resolve())
+
+        const content = document.body.querySelector(
+            '.note-editor-dialog .cm-content'
+        ) as HTMLElement
+        const view = EditorView.findFromDOM(content)
+        if (!view) {
+            throw new Error('Note editor was not mounted')
+        }
+        act(() =>
+            view.dispatch({
+                changes: {from: 0, to: view.state.doc.length, insert: '   '},
+            })
+        )
+
+        expect(
+            (
+                document.body.querySelector(
+                    '.note-editor-dialog button[aria-label="更新笔记"]'
+                ) as HTMLButtonElement
+            ).disabled
+        ).toBe(true)
+    })
+
     it('renders toolbar order, Markdown cards, metadata, and comments', () => {
         const {container, props} = renderSidebar()
         const refresh = container.querySelector(

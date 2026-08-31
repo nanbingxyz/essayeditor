@@ -692,6 +692,9 @@ function AppContent() {
         }
 
         const content = editorRef.current?.getValue() ?? draft.content
+        if (!content.trim()) {
+            return
+        }
         const selectedTheme = themes.themes.find(
             (theme) => theme.id === draft.themeId
         )
@@ -1321,6 +1324,7 @@ function AppContent() {
                     draft.ready &&
                     localDraftsReady &&
                     settings.ready &&
+                    draft.content.trim() &&
                     documentStatus !== 'published'
                 )}
                 ready={Boolean(
