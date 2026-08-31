@@ -52,6 +52,19 @@ const SVG_FALLBACK_PNG = Uint8Array.from([
 ])
 
 type ImageFormat = 'bmp' | 'gif' | 'jpg' | 'png' | 'svg'
+type DownloadedImageFormat = ImageFormat | 'webp'
+
+interface RasterizedImage {
+    data: Uint8Array
+    height: number
+    width: number
+}
+
+type ImageRasterizer = (
+    data: Uint8Array,
+    mimeType: string,
+    targetSize?: {height: number; width: number}
+) => Promise<RasterizedImage | null>
 
 interface EmbeddedImage {
     data: Uint8Array
@@ -63,6 +76,7 @@ interface EmbeddedImage {
 
 interface MarkdownDocxOptions {
     fetchImage?: HttpClient
+    rasterizeImage?: ImageRasterizer
 }
 
 interface InlineStyle {
@@ -234,7 +248,7 @@ function getSvgDimensions(data: Uint8Array) {
     return {height, width}
 }
 
-function detectImageFormat(data: Uint8Array): ImageFormat | null {
+function detectImageFormat(data: Uint8Array): DownloadedImageFormat | null {
     if (
         data.byteLength >= 8 &&
         data[0] === 137 &&
@@ -259,6 +273,19 @@ function detectImageFormat(data: Uint8Array): ImageFormat | null {
     if (data.byteLength >= 2 && data[0] === 66 && data[1] === 77) {
         return 'bmp'
     }
+    if (
+        data.byteLength >= 12 &&
+        data[0] === 82 &&
+        data[1] === 73 &&
+        data[2] === 70 &&
+        data[3] === 70 &&
+        data[8] === 87 &&
+        data[9] === 69 &&
+        data[10] === 66 &&
+        data[11] === 80
+    ) {
+        return 'webp'
+    }
     const prefix = new TextDecoder().decode(data.slice(0, 1024))
     return /<(?:\?xml[^>]*>\s*)?svg\b/i.test(prefix) ? 'svg' : null
 }
@@ -275,18 +302,18 @@ function scaleImage(width: number, height: number) {
     }
 }
 
-async function rasterizeSvg(
+async function rasterizeBrowserImage(
     data: Uint8Array,
-    width: number,
-    height: number
-) {
+    mimeType: string,
+    targetSize?: {height: number; width: number}
+): Promise<RasterizedImage | null> {
     if (
         typeof document === 'undefined' ||
         typeof URL.createObjectURL !== 'function'
     ) {
         return null
     }
-    const source = new Blob([data], {type: 'image/svg+xml'})
+    const source = new Blob([data], {type: mimeType})
     const sourceUrl = URL.createObjectURL(source)
     try {
         const image = new Image()
@@ -313,19 +340,33 @@ async function rasterizeSvg(
         if (!(await loaded)) {
             return null
         }
+        const dimensions = targetSize ??
+            scaleImage(image.naturalWidth, image.naturalHeight)
+        if (dimensions.width <= 0 || dimensions.height <= 0) {
+            return null
+        }
         const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
+        canvas.width = dimensions.width
+        canvas.height = dimensions.height
         const context = canvas.getContext('2d')
         if (!context) {
             return null
         }
-        context.drawImage(image, 0, 0, width, height)
+        context.drawImage(
+            image,
+            0,
+            0,
+            dimensions.width,
+            dimensions.height
+        )
         const output = await new Promise<Blob | null>((resolve) =>
             canvas.toBlob(resolve, 'image/png')
         )
         return output
-            ? new Uint8Array(await output.arrayBuffer())
+            ? {
+                  data: new Uint8Array(await output.arrayBuffer()),
+                  ...dimensions,
+              }
             : null
     } catch {
         return null
@@ -363,7 +404,11 @@ async function fetchImageWithoutReferrer(
     return null
 }
 
-async function downloadImage(url: string, fetchImage: HttpClient) {
+async function downloadImage(
+    url: string,
+    fetchImage: HttpClient,
+    rasterizeImage: ImageRasterizer
+) {
     if (!isPublicImageUrl(url)) {
         return null
     }
@@ -393,6 +438,12 @@ async function downloadImage(url: string, fetchImage: HttpClient) {
         if (!format) {
             return null
         }
+        if (format === 'webp') {
+            const converted = await rasterizeImage(data, 'image/webp')
+            return converted
+                ? {...converted, format: 'png' as const}
+                : null
+        }
         const dimensions =
             format === 'svg'
                 ? getSvgDimensions(data)
@@ -403,9 +454,14 @@ async function downloadImage(url: string, fetchImage: HttpClient) {
         const scaled = scaleImage(dimensions.width, dimensions.height)
         const fallback =
             format === 'svg'
-                ? await rasterizeSvg(data, scaled.width, scaled.height)
+                ? await rasterizeImage(data, 'image/svg+xml', scaled)
                 : null
-        return {data, fallback: fallback ?? undefined, format, ...scaled}
+        return {
+            data,
+            fallback: fallback?.data,
+            format,
+            ...scaled,
+        }
     } catch {
         return null
     } finally {
@@ -446,7 +502,8 @@ function collectImageUrls(root: Root, definitions: DefinitionMap) {
 
 async function downloadImages(
     urls: readonly string[],
-    fetchImage: HttpClient
+    fetchImage: HttpClient,
+    rasterizeImage: ImageRasterizer
 ) {
     const images: ImageMap = new Map()
     let nextIndex = 0
@@ -456,7 +513,11 @@ async function downloadImages(
             while (nextIndex < urls.length) {
                 const url = urls[nextIndex]
                 nextIndex += 1
-                const image = await downloadImage(url, fetchImage)
+                const image = await downloadImage(
+                    url,
+                    fetchImage,
+                    rasterizeImage
+                )
                 if (image) {
                     images.set(url, image)
                 }
@@ -884,7 +945,10 @@ function collectDefinitions(root: Root): DefinitionMap {
 
 export async function createMarkdownDocx(
     content: string,
-    {fetchImage = desktopHttpClient}: MarkdownDocxOptions = {}
+    {
+        fetchImage = desktopHttpClient,
+        rasterizeImage = rasterizeBrowserImage,
+    }: MarkdownDocxOptions = {}
 ) {
     const root = unified()
         .use(remarkParse)
@@ -893,7 +957,8 @@ export async function createMarkdownDocx(
     const definitions = collectDefinitions(root)
     const images = await downloadImages(
         collectImageUrls(root, definitions),
-        fetchImage
+        fetchImage,
+        rasterizeImage
     )
     const children = convertBlocks(root.children, definitions, images)
     const titleNode = root.children.find((node) => node.type === 'heading')

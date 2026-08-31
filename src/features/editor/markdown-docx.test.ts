@@ -17,6 +17,9 @@ const PNG_BYTES = Uint8Array.from([
     65, 84, 8, 215, 99, 248, 207, 192, 240, 31, 0, 5, 0, 1, 255, 137, 153,
     61, 29, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
 ])
+const WEBP_BYTES = Uint8Array.from([
+    82, 73, 70, 70, 12, 0, 0, 0, 87, 69, 66, 80, 86, 80, 56, 32,
+])
 
 describe('createMarkdownDocx', () => {
     beforeEach(() => {
@@ -112,6 +115,40 @@ const answer = 42
         expect(mediaFiles.some((path) => path.endsWith('.svg'))).toBe(true)
         expect(mediaFiles.some((path) => path.endsWith('.png'))).toBe(true)
         expect(documentXml).toContain('cx="6096000" cy="3048000"')
+    })
+
+    it('converts WebP to PNG before embedding it', async () => {
+        const imageUrl =
+            'https://static.lettersandlight.cn/essay/images/2026/the-principles-of-better-decisions-IC2Vv2.webp'
+        nativeImageFetch.mockResolvedValueOnce(new Response(WEBP_BYTES))
+        const rasterizeImage = vi.fn(async () => ({
+            data: PNG_BYTES,
+            height: 320,
+            width: 640,
+        }))
+
+        const output = await createMarkdownDocx(`![决策原则](${imageUrl})`, {
+            rasterizeImage,
+        })
+        const archive = await JSZip.loadAsync(output)
+        const mediaFiles = Object.keys(archive.files).filter(
+            (path) =>
+                path.startsWith('word/media/') && !archive.files[path].dir
+        )
+        const documentXml = await archive
+            .file('word/document.xml')
+            ?.async('string')
+
+        expect(rasterizeImage).toHaveBeenCalledWith(
+            WEBP_BYTES,
+            'image/webp'
+        )
+        expect(mediaFiles).toHaveLength(1)
+        expect(mediaFiles[0]).toMatch(/\.png$/)
+        expect(
+            await archive.file(mediaFiles[0])?.async('uint8array')
+        ).toEqual(PNG_BYTES)
+        expect(documentXml).not.toContain('[图片')
     })
 
     it('falls back to an image label and link when downloading fails', async () => {
