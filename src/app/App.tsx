@@ -488,6 +488,7 @@ function AppContent() {
             toast({
                 title: '文章已发布',
                 description: '你可以点击右侧按钮查看新发布的文章',
+                variant: 'success',
                 action: (
                     <ToastAction
                         altText="查看新发布文章"
@@ -753,7 +754,7 @@ function AppContent() {
                 themeId: draft.themeId,
                 themeSlug,
             })
-            toast({ title: '文章已更新' })
+            toast({ title: '文章已更新', variant: 'success' })
         } catch (error) {
             toast({
                 title: '更新失败',
@@ -979,7 +980,7 @@ function AppContent() {
                 getMarkdownExportFileName(activeDocument)
             )
             if (exported) {
-                toast({title: 'Markdown 文件已导出'})
+                toast({title: 'Markdown 文件已导出', variant: 'success'})
             }
         } catch (error) {
             toast({
@@ -1007,7 +1008,7 @@ function AppContent() {
                 getPdfExportFileName(activeDocument)
             )
             if (exported) {
-                toast({title: 'PDF 文件已导出'})
+                toast({title: 'PDF 文件已导出', variant: 'success'})
             }
         } catch (error) {
             toast({

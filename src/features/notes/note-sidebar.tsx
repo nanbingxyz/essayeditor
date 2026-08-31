@@ -634,7 +634,10 @@ export default function NoteSidebar({
                     ? await onUpdate(viewingNote.id, content, folderId)
                     : false
         if (succeeded) {
-            toast({ title: editorMode === 'create' ? '笔记已添加' : '笔记已更新' })
+            toast({
+                title: editorMode === 'create' ? '笔记已添加' : '笔记已更新',
+                variant: 'success',
+            })
         }
         return succeeded
     }
@@ -645,7 +648,7 @@ export default function NoteSidebar({
         }
         setDeleteOpen(false)
         setViewingId(null)
-        toast({ title: '笔记已删除' })
+        toast({ title: '笔记已删除', variant: 'success' })
     }
 
     return (
