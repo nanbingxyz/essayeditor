@@ -498,7 +498,7 @@ function AppContent() {
                             )
                         }
                     >
-                        查看
+                        <Open20Regular aria-hidden="true" />
                     </ToastAction>
                 ),
             })
