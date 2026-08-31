@@ -35,6 +35,27 @@ describe('EssayClient', () => {
         )
     })
 
+    it('omits a null theme id when publishing without a theme', async () => {
+        const httpClient = vi.fn(async () => response('{"id":"essay-id"}'))
+        const client = createEssayClient({
+            baseUrl: 'https://api.essay.ink',
+            httpClient,
+        })
+
+        await client.publish('content', null, false, 'token')
+
+        expect(httpClient).toHaveBeenCalledWith(
+            'https://api.essay.ink/essays',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    content: 'content',
+                    is_private: false,
+                }),
+            })
+        )
+    })
+
     it('preserves a server-provided error message', async () => {
         const client = createEssayClient({
             baseUrl: 'https://api.essay.ink',

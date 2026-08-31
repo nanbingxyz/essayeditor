@@ -464,7 +464,6 @@ describe('App navigation', () => {
                 method: 'POST',
                 body: JSON.stringify({
                     content: 'Publish me',
-                    theme_id: null,
                     is_private: false,
                 }),
             })

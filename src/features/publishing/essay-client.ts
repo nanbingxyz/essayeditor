@@ -68,7 +68,7 @@ export function createEssayClient(
                     },
                     body: JSON.stringify({
                         content,
-                        theme_id: themeId,
+                        ...(themeId === null ? {} : {theme_id: themeId}),
                         is_private: isPrivate,
                     }),
                 })

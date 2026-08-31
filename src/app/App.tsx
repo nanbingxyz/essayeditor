@@ -487,7 +487,7 @@ function AppContent() {
             activity.refresh()
             toast({
                 title: '文章已发布',
-                description: '你可以点击右侧按钮查看新发布的文章',
+                description: '',
                 variant: 'success',
                 action: (
                     <ToastAction

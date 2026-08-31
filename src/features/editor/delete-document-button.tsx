@@ -64,7 +64,8 @@ export default function DeleteDocumentButton({
                     <DialogClose asChild>
                         <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
+                            className="rounded-full"
                             disabled={deleting}
                         >
                             取消
@@ -73,6 +74,7 @@ export default function DeleteDocumentButton({
                     <Button
                         type="button"
                         variant="destructive"
+                        className="rounded-full"
                         disabled={deleting}
                         onClick={() => void confirmDelete()}
                     >
