@@ -55,6 +55,28 @@ const answer = 42
         expect(Array.from(output.slice(0, 4))).toEqual([80, 75, 3, 4])
     })
 
+    it('uses serif fonts and renders headings as bold black text', async () => {
+        const output = await createMarkdownDocx('# 黑色标题\n\n正文内容')
+        const archive = await JSZip.loadAsync(output)
+        const stylesXml = await archive.file('word/styles.xml')?.async('string')
+        const documentXml = await archive
+            .file('word/document.xml')
+            ?.async('string')
+        const headingStyle = stylesXml?.match(
+            /<w:style[^>]*w:styleId="Heading1"[\s\S]*?<\/w:style>/
+        )?.[0]
+        const headingParagraph = documentXml?.match(
+            /<w:p>[\s\S]*?<w:pStyle w:val="Heading1"\/>[\s\S]*?<\/w:p>/
+        )?.[0]
+
+        expect(stylesXml).toContain('w:ascii="Times New Roman"')
+        expect(stylesXml).toContain('w:eastAsia="宋体"')
+        expect(headingStyle).toContain('<w:b/>')
+        expect(headingStyle).toContain('<w:color w:val="000000"/>')
+        expect(headingParagraph).toContain('<w:b/>')
+        expect(headingParagraph).toContain('<w:color w:val="000000"/>')
+    })
+
     it('downloads without a referrer and embeds a Markdown image', async () => {
         nativeImageFetch.mockImplementation(async () =>
             new Response(PNG_BYTES, {
@@ -91,6 +113,36 @@ const answer = 42
         ).toEqual(PNG_BYTES)
         expect(documentXml).toContain('嵌入图片')
         expect(documentXml).not.toContain('[图片')
+        const cellMargins = documentXml?.match(
+            /<w:tcMar>[\s\S]*?<\/w:tcMar>/
+        )?.[0]
+        expect(cellMargins).toContain('<w:top w:type="dxa" w:w="240"/>')
+        expect(cellMargins).toContain('<w:bottom w:type="dxa" w:w="240"/>')
+        expect(documentXml).toContain(
+            '<w:spacing w:after="0" w:before="0" w:line="360"/>'
+        )
+        expect(documentXml).not.toContain(
+            '<w:t xml:space="preserve"> </w:t>'
+        )
+    })
+
+    it('adds explicit spacing around an image nested inside a link', async () => {
+        nativeImageFetch.mockResolvedValueOnce(new Response(PNG_BYTES))
+
+        const output = await createMarkdownDocx(
+            '[![链接图片](https://cdn.example.com/image.png)](https://example.com)'
+        )
+        const archive = await JSZip.loadAsync(output)
+        const documentXml = await archive
+            .file('word/document.xml')
+            ?.async('string')
+        const cellMargins = documentXml?.match(
+            /<w:tcMar>[\s\S]*?<\/w:tcMar>/
+        )?.[0]
+
+        expect(cellMargins).toContain('<w:top w:type="dxa" w:w="240"/>')
+        expect(cellMargins).toContain('<w:bottom w:type="dxa" w:w="240"/>')
+        expect(documentXml).toContain('<w:drawing>')
     })
 
     it('embeds SVG and scales it to the page width', async () => {

@@ -11,6 +11,7 @@
     "shell:default",
     "store:default",
     "log:default",
+    "core:window:allow-destroy",
     "core:window:allow-show",
     "core:window:allow-start-dragging",
     {

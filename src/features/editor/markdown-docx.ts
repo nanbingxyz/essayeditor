@@ -44,6 +44,13 @@ const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 const MAX_IMAGE_HEIGHT = 900
 const MAX_IMAGE_WIDTH = 640
 const IMAGE_DOWNLOAD_TIMEOUT = 10_000
+const IMAGE_VERTICAL_PADDING = 16
+const SERIF_FONT = {
+    ascii: 'Times New Roman',
+    cs: 'Times New Roman',
+    eastAsia: '宋体',
+    hAnsi: 'Times New Roman',
+}
 const SVG_FALLBACK_PNG = Uint8Array.from([
     137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0,
     1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68,
@@ -63,7 +70,10 @@ interface RasterizedImage {
 type ImageRasterizer = (
     data: Uint8Array,
     mimeType: string,
-    targetSize?: {height: number; width: number}
+    options?: {
+        targetSize?: {height: number; width: number}
+        verticalPadding?: number
+    }
 ) => Promise<RasterizedImage | null>
 
 interface EmbeddedImage {
@@ -81,6 +91,7 @@ interface MarkdownDocxOptions {
 
 interface InlineStyle {
     bold?: boolean
+    color?: string
     italics?: boolean
     strike?: boolean
 }
@@ -305,7 +316,13 @@ function scaleImage(width: number, height: number) {
 async function rasterizeBrowserImage(
     data: Uint8Array,
     mimeType: string,
-    targetSize?: {height: number; width: number}
+    {
+        targetSize,
+        verticalPadding = 0,
+    }: {
+        targetSize?: {height: number; width: number}
+        verticalPadding?: number
+    } = {}
 ): Promise<RasterizedImage | null> {
     if (
         typeof document === 'undefined' ||
@@ -347,7 +364,7 @@ async function rasterizeBrowserImage(
         }
         const canvas = document.createElement('canvas')
         canvas.width = dimensions.width
-        canvas.height = dimensions.height
+        canvas.height = dimensions.height + verticalPadding * 2
         const context = canvas.getContext('2d')
         if (!context) {
             return null
@@ -355,7 +372,7 @@ async function rasterizeBrowserImage(
         context.drawImage(
             image,
             0,
-            0,
+            verticalPadding,
             dimensions.width,
             dimensions.height
         )
@@ -365,7 +382,8 @@ async function rasterizeBrowserImage(
         return output
             ? {
                   data: new Uint8Array(await output.arrayBuffer()),
-                  ...dimensions,
+                  height: canvas.height,
+                  width: canvas.width,
               }
             : null
     } catch {
@@ -439,7 +457,9 @@ async function downloadImage(
             return null
         }
         if (format === 'webp') {
-            const converted = await rasterizeImage(data, 'image/webp')
+            const converted = await rasterizeImage(data, 'image/webp', {
+                verticalPadding: IMAGE_VERTICAL_PADDING,
+            })
             return converted
                 ? {...converted, format: 'png' as const}
                 : null
@@ -452,9 +472,20 @@ async function downloadImage(
             return null
         }
         const scaled = scaleImage(dimensions.width, dimensions.height)
+        const mimeType =
+            format === 'jpg' ? 'image/jpeg' : `image/${format}`
+        const padded = await rasterizeImage(data, mimeType, {
+            targetSize: scaled,
+            verticalPadding: IMAGE_VERTICAL_PADDING,
+        })
+        if (padded) {
+            return {...padded, format: 'png' as const}
+        }
         const fallback =
             format === 'svg'
-                ? await rasterizeImage(data, 'image/svg+xml', scaled)
+                ? await rasterizeImage(data, 'image/svg+xml', {
+                      targetSize: scaled,
+                  })
                 : null
         return {
             data,
@@ -566,6 +597,8 @@ function createTextRun(text: string, style: InlineStyle = {}) {
     return new TextRun({
         text,
         bold: style.bold,
+        color: style.color,
+        font: SERIF_FONT,
         italics: style.italics,
         strike: style.strike,
     })
@@ -601,9 +634,10 @@ function buildInlineChildren(
                     new TextRun({
                         text: node.value,
                         bold: style.bold,
+                        color: style.color,
+                        font: SERIF_FONT,
                         italics: style.italics,
                         strike: style.strike,
-                        font: 'Consolas',
                         shading: {
                             fill: 'F2F2F2',
                             type: ShadingType.CLEAR,
@@ -703,6 +737,48 @@ function createParagraph(
     })
 }
 
+function hasEmbeddedImage(
+    nodes: readonly PhrasingContent[],
+    definitions: DefinitionMap,
+    images: ImageMap
+): boolean {
+    return nodes.some((node) => {
+        if (node.type === 'image') {
+            return images.has(node.url)
+        }
+        if (node.type === 'imageReference') {
+            const definition = definitions.get(node.identifier)
+            return Boolean(definition && images.has(definition.url))
+        }
+        if (
+            node.type === 'strong' ||
+            node.type === 'emphasis' ||
+            node.type === 'delete' ||
+            node.type === 'link' ||
+            node.type === 'linkReference'
+        ) {
+            return hasEmbeddedImage(node.children, definitions, images)
+        }
+        return false
+    })
+}
+
+function createParagraphBlock(
+    node: MarkdownParagraph,
+    definitions: DefinitionMap,
+    images: ImageMap,
+    options: Omit<IParagraphOptions, 'children' | 'text'> = {}
+): FileChild[] {
+    if (!hasEmbeddedImage(node.children, definitions, images)) {
+        return [createParagraph(node, definitions, images, options)]
+    }
+    const paragraph = createParagraph(node, definitions, images, {
+        ...options,
+        spacing: {after: 0, before: 0, line: 360},
+    })
+    return [paragraph]
+}
+
 function createCodeParagraph(value: string) {
     const lines = value.split('\n')
     return new Paragraph({
@@ -711,7 +787,7 @@ function createCodeParagraph(value: string) {
                 new TextRun({
                     text: line || ' ',
                     break: index === 0 ? undefined : 1,
-                    font: 'Consolas',
+                    font: SERIF_FONT,
                     size: 19,
                 })
         ),
@@ -796,7 +872,7 @@ function convertListItem(
                   }
                 : node
             children.push(
-                createParagraph(paragraphNode, definitions, images, {
+                ...createParagraphBlock(paragraphNode, definitions, images, {
                     ...(hasListMarker
                         ? {indent: {left: 720 + level * 360}}
                         : ordered
@@ -841,19 +917,17 @@ function convertBlockquote(
 ) {
     return nodes.flatMap((node): FileChild[] => {
         if (node.type === 'paragraph') {
-            return [
-                createParagraph(node, definitions, images, {
-                    border: {
-                        left: {
-                            color: 'B7B7B7',
-                            size: 12,
-                            space: 10,
-                            style: BorderStyle.SINGLE,
-                        },
+            return createParagraphBlock(node, definitions, images, {
+                border: {
+                    left: {
+                        color: 'B7B7B7',
+                        size: 12,
+                        space: 10,
+                        style: BorderStyle.SINGLE,
                     },
-                    indent: {left: 360},
-                }),
-            ]
+                },
+                indent: {left: 360},
+            })
         }
         return convertBlocks([node], definitions, images)
     })
@@ -867,14 +941,15 @@ function convertBlocks(
     return nodes.flatMap((node): FileChild[] => {
         switch (node.type) {
             case 'paragraph':
-                return [createParagraph(node, definitions, images)]
+                return createParagraphBlock(node, definitions, images)
             case 'heading':
                 return [
                     new Paragraph({
                         children: buildInlineChildren(
                             node.children,
                             definitions,
-                            images
+                            images,
+                            {bold: true, color: '000000'}
                         ),
                         heading: HeadingLevel[
                             `HEADING_${node.depth}` as keyof typeof HeadingLevel
@@ -995,6 +1070,65 @@ export async function createMarkdownDocx(
                 },
             },
         ],
+        styles: {
+            default: {
+                document: {
+                    run: {
+                        color: '000000',
+                        font: SERIF_FONT,
+                        size: 22,
+                    },
+                },
+                heading1: {
+                    run: {
+                        bold: true,
+                        color: '000000',
+                        font: SERIF_FONT,
+                        size: 36,
+                    },
+                },
+                heading2: {
+                    run: {
+                        bold: true,
+                        color: '000000',
+                        font: SERIF_FONT,
+                        size: 32,
+                    },
+                },
+                heading3: {
+                    run: {
+                        bold: true,
+                        color: '000000',
+                        font: SERIF_FONT,
+                        size: 28,
+                    },
+                },
+                heading4: {
+                    run: {
+                        bold: true,
+                        color: '000000',
+                        font: SERIF_FONT,
+                        size: 26,
+                    },
+                },
+                heading5: {
+                    run: {
+                        bold: true,
+                        color: '000000',
+                        font: SERIF_FONT,
+                        size: 24,
+                    },
+                },
+                heading6: {
+                    run: {
+                        bold: true,
+                        color: '000000',
+                        font: SERIF_FONT,
+                        size: 22,
+                    },
+                },
+            },
+        },
         title,
     })
     return Packer.pack(document, 'uint8array')
