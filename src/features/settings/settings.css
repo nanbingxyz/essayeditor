@@ -60,6 +60,65 @@
     line-height: 1.4;
 }
 
+.api-key-description {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.api-key-help-trigger {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: hsl(var(--muted-foreground));
+    transition: color 120ms ease, background-color 120ms ease;
+}
+
+.api-key-help-trigger:hover,
+.api-key-help-trigger[data-popup-open] {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+}
+
+.api-key-help-trigger:focus-visible {
+    outline: 1px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+.api-key-help-positioner {
+    z-index: 50;
+}
+
+.api-key-help-popover {
+    display: grid;
+    width: min(360px, calc(100vw - 32px));
+    gap: 12px;
+    padding: 10px;
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) + 2px);
+    background: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    box-shadow: 0 12px 30px hsl(var(--foreground) / 0.14);
+    transform-origin: var(--transform-origin);
+}
+
+.api-key-help-popover img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+}
+
+.api-key-help-link {
+    width: 100%;
+    gap: 7px;
+}
+
 .appearance-section {
     margin-top: 38px;
 }

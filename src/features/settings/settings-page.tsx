@@ -1,4 +1,13 @@
-import { ArrowLeftIcon, EyeClosedIcon, EyeOpenIcon, MoonIcon, SunIcon, } from '@radix-ui/react-icons'
+import { Popover } from '@base-ui/react/popover'
+import {
+    ArrowLeftIcon,
+    EyeClosedIcon,
+    EyeOpenIcon,
+    MoonIcon,
+    OpenInNewWindowIcon,
+    QuestionMarkCircledIcon,
+    SunIcon,
+} from '@radix-ui/react-icons'
 import { DarkThemeRegular } from '@fluentui/react-icons'
 import { useState } from 'react'
 
@@ -66,9 +75,49 @@ export default function SettingsPage({
                     <Label id="api-key-heading" htmlFor="api-key">
                         API Key
                     </Label>
-                    <p>
-                        在 Essay 个人设置的“API 设置”中启用 API 并获取 API Key。
-                    </p>
+                    <div className="api-key-description">
+                        <p>
+                            在 Essay 个人设置的“API 设置”中启用 API 并获取 API Key。
+                        </p>
+                        <Popover.Root>
+                            <Popover.Trigger
+                                className="api-key-help-trigger"
+                                aria-label="查看 API Key 获取方式"
+                                openOnHover
+                                delay={150}
+                                closeDelay={150}
+                            >
+                                <QuestionMarkCircledIcon />
+                            </Popover.Trigger>
+                            <Popover.Portal>
+                                <Popover.Positioner
+                                    className="api-key-help-positioner"
+                                    side="bottom"
+                                    align="start"
+                                    sideOffset={8}
+                                >
+                                    <Popover.Popup className="api-key-help-popover">
+                                        <img
+                                            src="/apikey_help.jpg"
+                                            alt="Essay API 设置页面中启用 API 并获取 API Key 的位置"
+                                        />
+                                        <Button
+                                            type="button"
+                                            className="api-key-help-link"
+                                            onClick={() =>
+                                                void tauriDesktopAdapter.openExternal(
+                                                    'https://www.essay.ink/i/settings/api'
+                                                )
+                                            }
+                                        >
+                                            前往 API 设置
+                                            <OpenInNewWindowIcon />
+                                        </Button>
+                                    </Popover.Popup>
+                                </Popover.Positioner>
+                            </Popover.Portal>
+                        </Popover.Root>
+                    </div>
                 </div>
 
                 <div className="api-key-field">
