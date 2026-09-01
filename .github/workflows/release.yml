@@ -273,7 +273,10 @@ jobs:
               'darwin-aarch64',
               'darwin-x86_64',
           ]
-          const expectedPath = '/nanbingxyz/essayeditor-releases/releases/download/'
+          const expectedDownloadPath =
+              '/nanbingxyz/essayeditor-releases/releases/download/'
+          const expectedApiPath =
+              '/repos/nanbingxyz/essayeditor-releases/releases/assets/'
 
           for (const platform of expectedPlatforms) {
               const entry = manifest.platforms?.[platform]
@@ -282,7 +285,19 @@ jobs:
               }
 
               const url = new URL(entry.url)
-              if (url.hostname !== 'github.com' || !url.pathname.startsWith(expectedPath)) {
+              const isDownloadUrl =
+                  url.protocol === 'https:' &&
+                  url.hostname === 'github.com' &&
+                  url.pathname.startsWith(expectedDownloadPath)
+              const assetId = url.pathname.startsWith(expectedApiPath)
+                  ? url.pathname.slice(expectedApiPath.length)
+                  : ''
+              const isApiAssetUrl =
+                  url.protocol === 'https:' &&
+                  url.hostname === 'api.github.com' &&
+                  /^\d+$/.test(assetId)
+
+              if (!isDownloadUrl && !isApiAssetUrl) {
                   throw new Error(`${platform} points outside the public release repository`)
               }
           }
