@@ -84,9 +84,11 @@ const answer = 42
                 status: 200,
             })
         )
+        const rasterizeImage = vi.fn(async () => null)
 
         const output = await createMarkdownDocx(
-            '![嵌入图片](https://cdn.example.com/image.png)'
+            '![嵌入图片](https://cdn.example.com/image.png)',
+            {rasterizeImage}
         )
         const archive = await JSZip.loadAsync(output)
         const mediaFiles = Object.keys(archive.files).filter(
@@ -113,11 +115,14 @@ const answer = 42
         ).toEqual(PNG_BYTES)
         expect(documentXml).toContain('嵌入图片')
         expect(documentXml).not.toContain('[图片')
-        const cellMargins = documentXml?.match(
-            /<w:tcMar>[\s\S]*?<\/w:tcMar>/
-        )?.[0]
-        expect(cellMargins).toContain('<w:top w:type="dxa" w:w="240"/>')
-        expect(cellMargins).toContain('<w:bottom w:type="dxa" w:w="240"/>')
+        expect(rasterizeImage).toHaveBeenCalledWith(
+            PNG_BYTES,
+            'image/png',
+            {
+                targetSize: {height: 1, width: 1},
+                verticalPadding: 16,
+            }
+        )
         expect(documentXml).toContain(
             '<w:spacing w:after="0" w:before="0" w:line="360"/>'
         )
@@ -128,20 +133,25 @@ const answer = 42
 
     it('adds explicit spacing around an image nested inside a link', async () => {
         nativeImageFetch.mockResolvedValueOnce(new Response(PNG_BYTES))
+        const rasterizeImage = vi.fn(async () => null)
 
         const output = await createMarkdownDocx(
-            '[![链接图片](https://cdn.example.com/image.png)](https://example.com)'
+            '[![链接图片](https://cdn.example.com/image.png)](https://example.com)',
+            {rasterizeImage}
         )
         const archive = await JSZip.loadAsync(output)
         const documentXml = await archive
             .file('word/document.xml')
             ?.async('string')
-        const cellMargins = documentXml?.match(
-            /<w:tcMar>[\s\S]*?<\/w:tcMar>/
-        )?.[0]
 
-        expect(cellMargins).toContain('<w:top w:type="dxa" w:w="240"/>')
-        expect(cellMargins).toContain('<w:bottom w:type="dxa" w:w="240"/>')
+        expect(rasterizeImage).toHaveBeenCalledWith(
+            PNG_BYTES,
+            'image/png',
+            {
+                targetSize: {height: 1, width: 1},
+                verticalPadding: 16,
+            }
+        )
         expect(documentXml).toContain('<w:drawing>')
     })
 
@@ -193,7 +203,8 @@ const answer = 42
 
         expect(rasterizeImage).toHaveBeenCalledWith(
             WEBP_BYTES,
-            'image/webp'
+            'image/webp',
+            {verticalPadding: 16}
         )
         expect(mediaFiles).toHaveLength(1)
         expect(mediaFiles[0]).toMatch(/\.png$/)
