@@ -1,6 +1,6 @@
 [package]
 name = "essay-editor"
-version = "0.1.0"
+version = "1.0.0"
 description = "A Desktop Editor for Essay"
 authors = ["ironben"]
 edition = "2021"
