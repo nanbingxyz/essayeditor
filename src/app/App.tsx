@@ -982,6 +982,9 @@ function AppContent() {
         }
 
         const content = editorRef.current?.getValue() ?? draft.content
+        if (!content.trim()) {
+            return
+        }
         try {
             const exported = await tauriDesktopAdapter.exportMarkdown(
                 content,
@@ -1008,6 +1011,9 @@ function AppContent() {
         }
 
         const content = editorRef.current?.getValue() ?? draft.content
+        if (!content.trim()) {
+            return
+        }
         setExportingPdf(true)
         try {
             const pdf = await createMarkdownPdf(content)
@@ -1038,6 +1044,9 @@ function AppContent() {
         }
 
         const content = editorRef.current?.getValue() ?? draft.content
+        if (!content.trim()) {
+            return
+        }
         setExportingDocx(true)
         try {
             const {createMarkdownDocx} = await import(
@@ -1239,6 +1248,7 @@ function AppContent() {
                             !activeDocument ||
                             !draft.ready ||
                             !localDraftsReady ||
+                            !draft.content.trim() ||
                             publishing.loading ||
                             updating ||
                             deleting ||

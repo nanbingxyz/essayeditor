@@ -181,7 +181,11 @@ describe('App navigation', () => {
         const publishButton = container.querySelector(
             'button[aria-label="发布文章"]'
         ) as HTMLButtonElement
+        const exportButton = container.querySelector(
+            'button[aria-label="导出"]'
+        ) as HTMLButtonElement
         expect(publishButton.disabled).toBe(true)
+        expect(exportButton.disabled).toBe(true)
         expect(
             container.querySelector('button[aria-label="打开已发布文章"]')
         ).toBeNull()
@@ -192,8 +196,20 @@ describe('App navigation', () => {
         if (!editor) {
             throw new Error('Article editor was not mounted')
         }
-        act(() => editor.dispatch({changes: {from: 0, insert: 'Publish me'}}))
+        act(() => editor.dispatch({changes: {from: 0, insert: '   '}}))
+        expect(exportButton.disabled).toBe(true)
+
+        act(() =>
+            editor.dispatch({
+                changes: {
+                    from: 0,
+                    to: editor.state.doc.length,
+                    insert: 'Publish me',
+                },
+            })
+        )
         expect(publishButton.disabled).toBe(false)
+        expect(exportButton.disabled).toBe(false)
 
         act(() => publishButton.click())
         expect(container.querySelector('.settings-page-container')?.className)

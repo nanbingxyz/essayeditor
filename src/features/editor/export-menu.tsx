@@ -46,6 +46,12 @@ export default function ExportMenu({
         }
     }, [open])
 
+    useEffect(() => {
+        if (disabled) {
+            setOpen(false)
+        }
+    }, [disabled])
+
     const exportMarkdown = () => {
         setOpen(false)
         void onExportMarkdown()
@@ -76,7 +82,7 @@ export default function ExportMenu({
                 <ArrowCircleDownRight20Regular aria-hidden="true" />
             </button>
 
-            {open && (
+            {open && !disabled && (
                 <div
                     className="export-menu-content"
                     role="menu"

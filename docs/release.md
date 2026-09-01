@@ -43,7 +43,7 @@
 4. Repository permissions 将 `Contents` 设置为 `Read and write`。
 5. 设置合理的过期时间并创建令牌。
 
-进入私有源码仓库的 **Settings → Secrets and variables → Actions → Secrets**，创建名为 `RELEASE_TOKEN` 的 Repository Secret。
+进入私有源码仓库的 **Settings → Secrets and variables → Actions → Secrets**，创建名为 `RELEASE_TOKEN` 的 Repository Secret。 
 
 不要使用源码仓库自动提供的 `GITHUB_TOKEN` 代替它。默认 Token 只能写入当前私有仓库，不能向另一个仓库上传 Release。
 

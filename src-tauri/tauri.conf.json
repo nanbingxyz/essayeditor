@@ -38,7 +38,7 @@
     },
     "plugins": {
         "updater": {
-            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE1OTkzNjRBN0FFQjc4MDcKUldRSGVPdDZTamFacFYxOHlnNnR0RDhmeFhic245SW9GYU1uM242MzJSaEJUbU96RGxKYlE4L00K",
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5RDI3M0Y2QUQ1MTg1MDMKUldRRGhWR3Q5blBTV1EwMi9Bb0x4blNkcDlUa294WE5IVENhYXZRdEpsYlNnR0RneURvYmVMNmYK",
             "endpoints": [
                 "https://github.com/nanbingxyz/essayeditor-releases/releases/latest/download/latest.json"
             ],
