@@ -201,8 +201,8 @@ jobs:
           repo: essayeditor-releases
           releaseCommitish: main
           tagName: ${{ github.ref_name }}
-          releaseName: Essay ${{ github.ref_name }}
-          releaseBody: Installers and signed updater artifacts for Essay ${{ github.ref_name }}.
+          releaseName: Essay Editor ${{ github.ref_name }}
+          releaseBody: Installers and signed updater artifacts for Essay Editor ${{ github.ref_name }}.
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
