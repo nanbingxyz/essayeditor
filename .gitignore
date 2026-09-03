@@ -27,3 +27,4 @@ dist-ssr
 *.sw?
 /.vscode-upload.json
 /.vscode/extensions.json
+.zvec-grep
