@@ -513,6 +513,90 @@ describe('App navigation', () => {
         )
     })
 
+    it('rejects Markdown shells before publishing the article', async () => {
+        storeFiles.set(
+            'store.bin',
+            new Map([
+                ['accessToken', 'token'],
+                ['appearance', 'system'],
+            ])
+        )
+        storeFiles.set(
+            'drafts.bin',
+            new Map([
+                [
+                    'localDrafts',
+                    {
+                        version: 2,
+                        drafts: [
+                            {
+                                localId: 'empty-markdown',
+                                content: '[]()',
+                                createdAt: 1,
+                                themeId: null,
+                                updatedAt: 1,
+                            },
+                        ],
+                    },
+                ],
+            ])
+        )
+        httpFetch.mockImplementation(
+            async (input: string | URL | Request) => {
+                const url = String(input)
+                if (url.includes('/heatmap?')) {
+                    return new Response(
+                        JSON.stringify({
+                            user: {
+                                id: 'user',
+                                avatar: 'https://example.com/avatar.png',
+                                displayName: 'User',
+                            },
+                            heatmap: {},
+                        })
+                    )
+                }
+                if (url.includes('/essays?')) {
+                    return new Response('[]')
+                }
+                throw new Error(`Unexpected request: ${url}`)
+            }
+        )
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+
+        await act(async () => {
+            root.render(
+                <>
+                    <App />
+                    <Toaster />
+                </>
+            )
+            await settle(12)
+        })
+
+        const publishButton = container.querySelector(
+            'button[aria-label="发布文章"]'
+        ) as HTMLButtonElement
+        expect(publishButton.disabled).toBe(false)
+
+        await act(async () => {
+            publishButton.click()
+            await settle()
+        })
+
+        expect(document.body.textContent).toContain('请勿空发无字帖')
+        expect(
+            httpFetch.mock.calls.some(
+                ([, init]) =>
+                    init?.method === 'POST' || init?.method === 'PUT'
+            )
+        ).toBe(false)
+    })
+
     it('publishes the selected numeric theme id', async () => {
         storeFiles.set(
             'store.bin',

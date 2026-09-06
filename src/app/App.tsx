@@ -49,6 +49,7 @@ import {
 } from '@/features/notes'
 import {
     createEssayClient,
+    hasRenderableMarkdownContent,
     usePublishingController,
 } from '@/features/publishing'
 import {
@@ -681,6 +682,16 @@ function AppContent() {
         if (!activeDocument) {
             return
         }
+
+        const content = editorRef.current?.getValue() ?? draft.content
+        if (!hasRenderableMarkdownContent(content)) {
+            toast({
+                description: '请勿空发无字帖',
+                variant: 'destructive',
+            })
+            return
+        }
+
         if (!settings.accessToken) {
             openSettings()
             toast({
@@ -696,10 +707,6 @@ function AppContent() {
             return
         }
 
-        const content = editorRef.current?.getValue() ?? draft.content
-        if (!content.trim()) {
-            return
-        }
         const selectedTheme = themes.themes.find(
             (theme) => theme.id === draft.themeId
         )
