@@ -70,7 +70,7 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     padding: 0 10px;
     color: hsl(var(--foreground) / 0.78);
     background: hsl(var(--primary) / 0.1);
-    font-size: 0.75rem;
+    font-size: 11px;
     line-height: 1;
     text-overflow: ellipsis;
     white-space: nowrap;
