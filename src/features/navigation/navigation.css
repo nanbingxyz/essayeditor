@@ -415,7 +415,7 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
 }
 
 .essay-index-item.is-active {
-    background: hsl(var(--accent));
+    background: hsl(var(--accent)/0.45);
 }
 
 .essay-new-item {
@@ -888,6 +888,10 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     width: min(240px, calc(100vw - 48px));
     transform: translateX(-100%);
     box-shadow: 12px 0 30px rgb(0 0 0 / 0.12);
+}
+
+html[data-platform='macos'] .is-narrow .app-sidebar {
+    background: hsl(var(--sidebar-background));
 }
 
 .is-narrow.sidebar-is-visible .app-sidebar {
