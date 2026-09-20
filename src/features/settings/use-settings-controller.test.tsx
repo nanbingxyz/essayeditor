@@ -68,6 +68,7 @@ describe('useSettingsController', () => {
                         apiKey: '',
                         baseUrl: '',
                         model: '',
+                        reasoningEnabled: true,
                         verified: false,
                     },
                 })
@@ -117,6 +118,7 @@ describe('useSettingsController', () => {
                         apiKey: '',
                         baseUrl: '',
                         model: '',
+                        reasoningEnabled: true,
                         verified: false,
                     },
                 })
@@ -162,6 +164,7 @@ describe('useSettingsController', () => {
                         apiKey: '',
                         baseUrl: '',
                         model: '',
+                        reasoningEnabled: true,
                         verified: false,
                     },
                 })
@@ -206,6 +209,23 @@ describe('useSettingsController', () => {
         })
         expect(getController().llmSettings.verified).toBe(true)
         expect(getController().testStatus).toBe('success')
+        expect(llmClient.testConnection).toHaveBeenCalledWith(
+            expect.objectContaining({
+                extra_body: {
+                    reasoning_effort: 'medium',
+                    thinking: {type: 'enabled'},
+                },
+            }),
+            expect.anything()
+        )
+
+        act(() => getController().changeLlmReasoningEnabled(false))
+        expect(getController().llmSettings.reasoningEnabled).toBe(false)
+        expect(getController().llmSettings.verified).toBe(true)
+        await act(async () => Promise.resolve())
+        expect(repository.saveLlmSettings).toHaveBeenCalledWith(
+            expect.objectContaining({reasoningEnabled: false, verified: true})
+        )
 
         act(() => getController().changeLlmModel('model-b'))
         expect(getController().llmSettings.verified).toBe(false)

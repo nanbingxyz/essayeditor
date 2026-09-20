@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef, useState} from 'react'
 
 import {
     createOpenAiCompatibleClient,
+    toOpenAiConfig,
     type OpenAiCompatibleClient,
 } from '@/features/analysis/openai-client'
 import {
@@ -15,6 +16,7 @@ import type {
     LlmActionStatus,
     LlmSettings,
 } from './model'
+import {defaultLlmSettings} from './model'
 import type {SettingsRepository} from './settings-repository'
 
 const API_KEY_SAVE_DELAY = 400
@@ -50,10 +52,7 @@ export function useSettingsController({
     const [saveStatus, setSaveStatus] =
         useState<ApiKeySaveStatus>('idle')
     const [llmSettings, setLlmSettings] = useState<LlmSettings>({
-        apiKey: '',
-        baseUrl: '',
-        model: '',
-        verified: false,
+        ...defaultLlmSettings,
     })
     const [llmSaveStatus, setLlmSaveStatus] =
         useState<ApiKeySaveStatus>('idle')
@@ -166,6 +165,7 @@ export function useSettingsController({
                 apiKey: settings.apiKey.trim(),
                 baseUrl: settings.baseUrl.trim().replace(/\/+$/, ''),
                 model: settings.model.trim(),
+                reasoningEnabled: settings.reasoningEnabled,
                 verified: settings.verified,
             }
             const generation = ++llmSaveGenerationRef.current
@@ -225,6 +225,21 @@ export function useSettingsController({
             }
         },
         [scheduleLlmSave]
+    )
+
+    const changeLlmReasoningEnabled = useCallback(
+        (enabled: boolean) => {
+            setLlmSettings((current) => {
+                const next = {
+                    ...current,
+                    reasoningEnabled: enabled,
+                }
+                llmSettingsRef.current = next
+                void enqueueLlmSave(next)
+                return next
+            })
+        },
+        [enqueueLlmSave]
     )
 
     const flushLlmSettings = useCallback(async () => {
@@ -310,7 +325,10 @@ export function useSettingsController({
         setTestStatus('loading')
         setTestError('')
         try {
-            await llmClient.testConnection(config, request.signal)
+            await llmClient.testConnection(
+                toOpenAiConfig(config),
+                request.signal
+            )
             if (request.signal.aborted) {
                 return false
             }
@@ -419,6 +437,7 @@ export function useSettingsController({
             changeLlmSetting('baseUrl', value),
         changeLlmModel: (value: string) =>
             changeLlmSetting('model', value),
+        changeLlmReasoningEnabled,
         discoverModels,
         flushAllSettings,
         flushApiKeySave,

@@ -5,6 +5,7 @@ import type {HttpClient} from '@/shared/platform/http'
 import {
     createOpenAiCompatibleClient,
     OpenAiCompatibleError,
+    toOpenAiConfig,
 } from './openai-client'
 
 function jsonResponse(payload: unknown, status = 200) {
@@ -15,6 +16,29 @@ function jsonResponse(payload: unknown, status = 200) {
 }
 
 describe('OpenAI-compatible client', () => {
+    it('maps the reasoning toggle into extra_body', () => {
+        expect(
+            toOpenAiConfig({
+                apiKey: 'key',
+                baseUrl: 'https://example.com/v1',
+                model: 'test-model',
+                reasoningEnabled: true,
+            }).extra_body
+        ).toEqual({
+            thinking: {type: 'enabled'},
+            reasoning_effort: 'medium',
+        })
+        expect(
+            toOpenAiConfig({
+                apiKey: 'key',
+                baseUrl: 'https://example.com/v1',
+                model: 'test-model',
+                reasoningEnabled: false,
+            }).extra_body
+        ).toEqual({
+            thinking: {type: 'disabled'},
+        })
+    })
     it('discovers and sorts model ids', async () => {
         const httpClient = vi.fn(async () =>
             jsonResponse({
@@ -69,6 +93,32 @@ describe('OpenAI-compatible client', () => {
         expect(JSON.parse(String(init?.body))).toEqual({
             model: 'test-model',
             messages: [{role: 'user', content: 'text'}],
+        })
+    })
+
+    it('forwards extra_body fields into the completion payload', async () => {
+        const httpClient = vi.fn(async () =>
+            jsonResponse({
+                choices: [{message: {content: 'OK'}}],
+            })
+        ) as HttpClient
+        const client = createOpenAiCompatibleClient(httpClient)
+
+        await client.complete(
+            {
+                apiKey: 'key',
+                baseUrl: 'https://example.com/v1',
+                extra_body: {thinking: {type: 'disabled'}},
+                model: 'test-model',
+            },
+            [{role: 'user', content: 'text'}]
+        )
+
+        const init = vi.mocked(httpClient).mock.calls[0]?.[1]
+        expect(JSON.parse(String(init?.body))).toEqual({
+            messages: [{role: 'user', content: 'text'}],
+            model: 'test-model',
+            thinking: {type: 'disabled'},
         })
     })
 

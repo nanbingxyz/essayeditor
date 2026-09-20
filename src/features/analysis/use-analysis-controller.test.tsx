@@ -5,7 +5,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {LlmSettings} from '@/features/settings'
 
 import type {AnalysisRepository} from './analysis-repository'
-import type {OpenAiCompatibleClient} from './openai-client'
+import type {OpenAiCompatibleClient, OpenAiConfig} from './openai-client'
 import {useAnalysisController} from './use-analysis-controller'
 
 const roots: Root[] = []
@@ -69,6 +69,7 @@ const verifiedSettings: LlmSettings = {
     apiKey: 'key',
     baseUrl: 'https://example.com/v1',
     model: 'model',
+    reasoningEnabled: true,
     verified: true,
 }
 
@@ -202,5 +203,33 @@ describe('useAnalysisController', () => {
         })
         expect(getController().running).toBe(false)
         expect(repository.save).not.toHaveBeenCalled()
+    })
+
+    it('sends reasoning extra_body according to the toggle', async () => {
+        let sentConfig: OpenAiConfig | undefined
+        const complete = vi.fn(async (config: OpenAiConfig) => {
+            sentConfig = config
+            return '{"issues":[]}'
+        })
+        const getController = renderController({
+            client: {
+                complete,
+                listModels: vi.fn(async () => []),
+                testConnection: vi.fn(async () => undefined),
+            },
+            llmSettings: {...verifiedSettings, reasoningEnabled: false},
+            repository: createRepository(),
+        })
+        await act(async () => Promise.resolve())
+
+        await act(async () => {
+            await getController().start()
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        expect(sentConfig?.extra_body).toEqual({
+            thinking: {type: 'disabled'},
+        })
     })
 })

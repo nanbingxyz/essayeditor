@@ -7,6 +7,28 @@ export interface OpenAiConfig {
     apiKey: string
     baseUrl: string
     model: string
+    extra_body?: Record<string, unknown>
+}
+
+export function toOpenAiConfig(settings: {
+    apiKey: string
+    baseUrl: string
+    model: string
+    reasoningEnabled: boolean
+}): OpenAiConfig {
+    return {
+        apiKey: settings.apiKey,
+        baseUrl: settings.baseUrl,
+        model: settings.model,
+        extra_body: settings.reasoningEnabled
+            ? {
+                  thinking: {type: 'enabled'},
+                  reasoning_effort: 'medium',
+              }
+            : {
+                  thinking: {type: 'disabled'},
+              },
+    }
 }
 
 export interface ChatMessage {
@@ -172,6 +194,7 @@ export function createOpenAiCompatibleClient(
                     Authorization: `Bearer ${config.apiKey}`,
                 },
                 body: JSON.stringify({
+                    ...config.extra_body,
                     model: config.model,
                     messages,
                     ...(maxTokens === undefined

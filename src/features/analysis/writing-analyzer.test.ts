@@ -129,12 +129,17 @@ describe('writing analyzer response parsing', () => {
 })
 
 describe('writing analyzer chunking', () => {
-    it('preserves source offsets across paragraphs', () => {
-        const content = '第一段。\n\n第二段。'
+    it('keeps articles within 10000 characters in one chunk', () => {
+        const content = '字'.repeat(10000)
+        expect(createAnalysisChunks(content)).toHaveLength(1)
+    })
+
+    it('splits after 10000 characters', () => {
+        const content = `${'甲'.repeat(10000)}${'乙'.repeat(10)}`
         const chunks = createAnalysisChunks(content)
-        expect(chunks.map(({from, text}) => ({from, text}))).toEqual([
-            {from: 0, text: content},
-        ])
+        expect(chunks).toHaveLength(2)
+        expect(chunks[0]?.text).toHaveLength(10000)
+        expect(chunks[1]?.text).toBe('乙'.repeat(10))
     })
 
     it('sends stripped prose and maps findings back through markdown', async () => {
@@ -208,32 +213,39 @@ describe('writing analyzer chunking', () => {
         expect(complete).not.toHaveBeenCalled()
     })
 
-    it('analyzes chunks sequentially and reports progress', async () => {
-        const complete = vi
-            .fn()
-            .mockResolvedValueOnce('{"issues":[]}')
-            .mockResolvedValueOnce('{"issues":[]}')
-        const client: OpenAiCompatibleClient = {
-            complete,
-            listModels: vi.fn(async () => []),
-            testConnection: vi.fn(async () => undefined),
-        }
+    it('analyzes chunks in parallel and reports progress after all complete', async () => {
+        let inFlight = 0
+        let maxInFlight = 0
+        const complete = vi.fn(async () => {
+            inFlight += 1
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            inFlight -= 1
+            return '{"issues":[]}'
+        })
         const onProgress = vi.fn()
 
         await expect(
             analyzeWriting({
-                client,
+                client: {
+                    complete,
+                    listModels: vi.fn(async () => []),
+                    testConnection: vi.fn(async () => undefined),
+                },
                 config: {
                     apiKey: 'key',
                     baseUrl: 'https://example.com/v1',
                     model: 'model',
                 },
-                content: `第一段。\n\n${'字'.repeat(5000)}`,
+                content: `${'甲'.repeat(10000)}${'乙'.repeat(10)}`,
                 onProgress,
             })
         ).resolves.toEqual([])
         expect(complete).toHaveBeenCalledTimes(2)
-        expect(onProgress).toHaveBeenNthCalledWith(1, 1, 2)
-        expect(onProgress).toHaveBeenNthCalledWith(2, 2, 2)
+        expect(maxInFlight).toBe(2)
+        expect(onProgress).toHaveBeenCalledWith(0, 2)
+        expect(onProgress).toHaveBeenCalledWith(1, 2)
+        expect(onProgress).toHaveBeenCalledWith(2, 2)
+        expect(onProgress).toHaveBeenLastCalledWith(2, 2)
     })
 })

@@ -14,7 +14,7 @@ import {
     mapExtractedRange,
 } from './extract-analysis-text'
 
-const MAX_CHUNK_LENGTH = 5000
+const MAX_CHUNK_LENGTH = 10000
 const MIN_CONFIDENCE = 0.85
 const categorySet = new Set<string>(analysisCategories)
 
@@ -250,43 +250,49 @@ export async function analyzeWriting({
 }: AnalyzeWritingOptions) {
     const extracted = extractAnalysisText(content)
     const chunks = createAnalysisChunks(extracted.text)
-    const issues: AnalysisIssue[] = []
-    for (let index = 0; index < chunks.length; index += 1) {
-        signal?.throwIfAborted()
-        const chunk = chunks[index]
-        const response = await client.complete(
-            config,
-            [
-                {role: 'system', content: WRITING_ANALYSIS_SYSTEM_PROMPT},
-                {
-                    role: 'user',
-                    content: JSON.stringify({text: chunk.text}),
-                },
-            ],
-            signal
-        )
-        for (const issue of parseAnalysisResponse(response, chunk)) {
-            const mapped = mapExtractedRange(
-                extracted,
-                issue.from,
-                issue.to
+    signal?.throwIfAborted()
+    onProgress?.(0, chunks.length)
+
+    let completed = 0
+    const chunkIssues = await Promise.all(
+        chunks.map(async (chunk) => {
+            const response = await client.complete(
+                config,
+                [
+                    {role: 'system', content: WRITING_ANALYSIS_SYSTEM_PROMPT},
+                    {
+                        role: 'user',
+                        content: JSON.stringify({text: chunk.text}),
+                    },
+                ],
+                signal
             )
-            if (!mapped) {
-                continue
+            const issues: AnalysisIssue[] = []
+            for (const issue of parseAnalysisResponse(response, chunk)) {
+                const mapped = mapExtractedRange(
+                    extracted,
+                    issue.from,
+                    issue.to
+                )
+                if (!mapped) {
+                    continue
+                }
+                issues.push({
+                    ...issue,
+                    from: mapped.from,
+                    id: `${issue.id}:${mapped.from}:${mapped.to}`,
+                    quote: mapped.quote,
+                    to: mapped.to,
+                })
             }
-            issues.push({
-                ...issue,
-                from: mapped.from,
-                id: `${issue.id}:${mapped.from}:${mapped.to}`,
-                quote: mapped.quote,
-                to: mapped.to,
-            })
-        }
-        onProgress?.(index + 1, chunks.length)
-    }
+            completed += 1
+            onProgress?.(completed, chunks.length)
+            return issues
+        })
+    )
 
     const seen = new Set<string>()
-    return issues.filter((issue) => {
+    return chunkIssues.flat().filter((issue) => {
         const key = [
             issue.from,
             issue.to,

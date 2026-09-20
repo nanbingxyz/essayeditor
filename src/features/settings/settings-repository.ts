@@ -4,6 +4,7 @@ import {
 } from '@/shared/platform/store'
 
 import type {Appearance, LlmSettings, SettingsSnapshot} from './model'
+import {defaultLlmSettings} from './model'
 
 const SETTINGS_STORE_PATH = 'store.bin'
 const ACCESS_TOKEN_KEY = 'accessToken'
@@ -23,7 +24,7 @@ function normalizeAppearance(value: unknown): Appearance {
 
 function parseLlmSettings(value: unknown): LlmSettings {
     if (typeof value !== 'object' || value === null) {
-        return {apiKey: '', baseUrl: '', model: '', verified: false}
+        return {...defaultLlmSettings}
     }
     const candidate = value as Record<string, unknown>
     return {
@@ -39,6 +40,7 @@ function parseLlmSettings(value: unknown): LlmSettings {
             typeof candidate.model === 'string'
                 ? candidate.model.trim()
                 : '',
+        reasoningEnabled: candidate.reasoningEnabled !== false,
         verified: candidate.verified === true,
     }
 }
@@ -84,6 +86,7 @@ export function createSettingsRepository(
                 apiKey: settings.apiKey.trim(),
                 baseUrl: settings.baseUrl.trim().replace(/\/+$/, ''),
                 model: settings.model.trim(),
+                reasoningEnabled: settings.reasoningEnabled,
                 verified: settings.verified,
             } satisfies LlmSettings)
             await store.save()

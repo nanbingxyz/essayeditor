@@ -174,6 +174,83 @@
     margin-top: 4px;
 }
 
+.llm-reasoning-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 8px;
+    padding: 10px 0 2px;
+    cursor: pointer;
+}
+
+.llm-reasoning-row:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.llm-reasoning-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.llm-reasoning-copy span {
+    color: hsl(var(--foreground));
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.llm-reasoning-copy small {
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.llm-reasoning-switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 24px;
+    margin-top: 1px;
+    appearance: none;
+    border: 0;
+    border-radius: 999px;
+    background: hsl(var(--input));
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.llm-reasoning-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: hsl(var(--card));
+    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.18);
+    transition: transform 120ms ease;
+}
+
+.llm-reasoning-switch:checked {
+    background: hsl(var(--foreground));
+}
+
+.llm-reasoning-switch:checked::after {
+    transform: translateX(16px);
+}
+
+.llm-reasoning-switch:focus-visible {
+    outline: 1px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+.llm-reasoning-switch:disabled {
+    cursor: not-allowed;
+}
+
 .llm-inline-status {
     margin: 0;
     color: hsl(var(--muted-foreground));

@@ -2,7 +2,7 @@ export const WRITING_CHECKLIST_VERSION = 1
 
 export const WRITING_ANALYSIS_SYSTEM_PROMPT = `你是谨慎的中文写作分析员。你的目标只是指出明显且高置信的问题，不替作者改写文章，也不把个人偏好当成错误。
 
-逐项检查以下清单：
+在同一次分析中对照以下全部清单，一次性返回所有明显问题：
 一、用词与字词差错（客观硬伤）
 1.1 错别字、同音或近音字误用
 1.2 形近字误用

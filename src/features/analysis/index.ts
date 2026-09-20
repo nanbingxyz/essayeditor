@@ -6,6 +6,7 @@ export type {AnalysisRepository} from './analysis-repository'
 export {
     createOpenAiCompatibleClient,
     OpenAiCompatibleError,
+    toOpenAiConfig,
 } from './openai-client'
 export type {
     OpenAiCompatibleClient,

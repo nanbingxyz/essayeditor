@@ -1516,6 +1516,7 @@ function AppContent() {
             });
           }}
           onLlmModelChange={settings.changeLlmModel}
+          onLlmReasoningEnabledChange={settings.changeLlmReasoningEnabled}
           onTestLlm={() => void settings.testLlmConnection()}
           appearance={settings.appearance}
           onAppearanceChange={settings.changeAppearance}

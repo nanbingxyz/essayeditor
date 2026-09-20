@@ -15,6 +15,7 @@ function renderSettings(disabled = false, models: string[] = []) {
     const root = createRoot(container)
     roots.push(root)
     const onAppearanceChange = vi.fn()
+    const onLlmReasoningEnabledChange = vi.fn()
     const onTestLlm = vi.fn()
     const updaterService: UpdaterService = {
         check: vi.fn(async () => null),
@@ -33,6 +34,7 @@ function renderSettings(disabled = false, models: string[] = []) {
                         apiKey: '',
                         baseUrl: '',
                         model: models[0] ?? '',
+                        reasoningEnabled: true,
                         verified: false,
                     }}
                     llmSaveStatus="idle"
@@ -47,6 +49,7 @@ function renderSettings(disabled = false, models: string[] = []) {
                     onLlmBaseUrlChange={vi.fn()}
                     onLlmBlur={vi.fn()}
                     onLlmModelChange={vi.fn()}
+                    onLlmReasoningEnabledChange={onLlmReasoningEnabledChange}
                     onTestLlm={onTestLlm}
                     onAppearanceChange={onAppearanceChange}
                     onBack={vi.fn()}
@@ -57,7 +60,7 @@ function renderSettings(disabled = false, models: string[] = []) {
         )
     )
 
-    return {container, onAppearanceChange, onTestLlm}
+    return {container, onAppearanceChange, onLlmReasoningEnabledChange, onTestLlm}
 }
 
 afterEach(() => {
@@ -145,5 +148,20 @@ describe('SettingsPage appearance controls', () => {
         expect(Array.from(select.options).map((option) => option.value)).toEqual(
             ['model-a', 'model-b']
         )
+    })
+
+    it('toggles reasoning with a warning about longer analysis', () => {
+        const {container, onLlmReasoningEnabledChange} = renderSettings()
+        const toggle = container.querySelector<HTMLInputElement>(
+            '#llm-reasoning'
+        )
+
+        expect(toggle?.checked).toBe(true)
+        expect(container.textContent).toContain(
+            '开启后分析耗时更长，但质量通常会提高。'
+        )
+
+        act(() => toggle?.click())
+        expect(onLlmReasoningEnabledChange).toHaveBeenCalledWith(false)
     })
 })

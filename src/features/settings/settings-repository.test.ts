@@ -37,6 +37,7 @@ describe('SettingsRepository', () => {
                 apiKey: 'llm-key',
                 baseUrl: 'https://example.com/v1',
                 model: 'model-a',
+                reasoningEnabled: true,
                 verified: true,
             },
         })
@@ -52,6 +53,7 @@ describe('SettingsRepository', () => {
             apiKey: ' llm-key ',
             baseUrl: 'https://example.com/v1/',
             model: ' model ',
+            reasoningEnabled: false,
             verified: true,
         })
 
@@ -61,6 +63,7 @@ describe('SettingsRepository', () => {
             apiKey: 'llm-key',
             baseUrl: 'https://example.com/v1',
             model: 'model',
+            reasoningEnabled: false,
             verified: true,
         })
         expect(store.save).toHaveBeenCalledTimes(3)

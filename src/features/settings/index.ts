@@ -8,3 +8,4 @@ export type {
     LlmActionStatus,
     LlmSettings,
 } from './model'
+export {defaultLlmSettings} from './model'

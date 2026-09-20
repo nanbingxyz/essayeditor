@@ -7,7 +7,16 @@ export interface LlmSettings {
     apiKey: string
     baseUrl: string
     model: string
+    reasoningEnabled: boolean
     verified: boolean
+}
+
+export const defaultLlmSettings: LlmSettings = {
+    apiKey: '',
+    baseUrl: '',
+    model: '',
+    reasoningEnabled: true,
+    verified: false,
 }
 
 export interface SettingsSnapshot {
