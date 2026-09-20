@@ -9,6 +9,10 @@ import {
     type AnalysisIssue,
 } from './model'
 import {WRITING_ANALYSIS_SYSTEM_PROMPT} from './checklist'
+import {
+    extractAnalysisText,
+    mapExtractedRange,
+} from './extract-analysis-text'
 
 const MAX_CHUNK_LENGTH = 5000
 const MIN_CONFIDENCE = 0.85
@@ -244,7 +248,8 @@ export async function analyzeWriting({
     onProgress,
     signal,
 }: AnalyzeWritingOptions) {
-    const chunks = createAnalysisChunks(content)
+    const extracted = extractAnalysisText(content)
+    const chunks = createAnalysisChunks(extracted.text)
     const issues: AnalysisIssue[] = []
     for (let index = 0; index < chunks.length; index += 1) {
         signal?.throwIfAborted()
@@ -260,7 +265,23 @@ export async function analyzeWriting({
             ],
             signal
         )
-        issues.push(...parseAnalysisResponse(response, chunk))
+        for (const issue of parseAnalysisResponse(response, chunk)) {
+            const mapped = mapExtractedRange(
+                extracted,
+                issue.from,
+                issue.to
+            )
+            if (!mapped) {
+                continue
+            }
+            issues.push({
+                ...issue,
+                from: mapped.from,
+                id: `${issue.id}:${mapped.from}:${mapped.to}`,
+                quote: mapped.quote,
+                to: mapped.to,
+            })
+        }
         onProgress?.(index + 1, chunks.length)
     }
 

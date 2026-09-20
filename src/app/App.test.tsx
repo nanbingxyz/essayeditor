@@ -273,7 +273,12 @@ describe('App navigation', () => {
         const root = createRoot(container)
         roots.push(root)
         await act(async () => {
-            root.render(<App />)
+            root.render(
+                <>
+                    <App />
+                    <Toaster />
+                </>
+            )
             await settle(12)
         })
 
@@ -332,6 +337,7 @@ describe('App navigation', () => {
             )
         ).not.toBe('true')
         expect(container.querySelector('.cm-analysis-hard')).not.toBeNull()
+        expect(document.body.textContent).toContain('找到 1 处可优化点')
         expect(
             storeFiles
                 .get('analysis.bin')

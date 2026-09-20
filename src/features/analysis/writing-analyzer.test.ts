@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest'
 
-import type {OpenAiCompatibleClient} from './openai-client'
+import type {ChatMessage, OpenAiCompatibleClient} from './openai-client'
 import {
     analyzeWriting,
     createAnalysisChunks,
@@ -135,6 +135,77 @@ describe('writing analyzer chunking', () => {
         expect(chunks.map(({from, text}) => ({from, text}))).toEqual([
             {from: 0, text: content},
         ])
+    })
+
+    it('sends stripped prose and maps findings back through markdown', async () => {
+        let sentText = ''
+        const complete = vi.fn(
+            async (_config: unknown, messages: ChatMessage[]) => {
+            sentText =
+                messages.find((message) => message.role === 'user')
+                    ?.content ?? ''
+            return JSON.stringify({
+                issues: [
+                    {
+                        start: 0,
+                        end: 2,
+                        quote: '安祥',
+                        category: '1.1',
+                        severity: 'hard',
+                        message: '同音字误用',
+                        suggestion: '“安祥”应该是“安详”',
+                        confidence: 0.99,
+                    },
+                ],
+            })
+        }) satisfies OpenAiCompatibleClient['complete']
+        const client: OpenAiCompatibleClient = {
+            complete,
+            listModels: vi.fn(async () => []),
+            testConnection: vi.fn(async () => undefined),
+        }
+        const source = '看[安祥](https://example.com)离世'
+
+        const issues = await analyzeWriting({
+            client,
+            config: {
+                apiKey: 'key',
+                baseUrl: 'https://example.com/v1',
+                model: 'model',
+            },
+            content: source,
+        })
+
+        expect(JSON.parse(sentText)).toEqual({
+            text: '看安祥离世',
+        })
+        expect(issues).toMatchObject([
+            {
+                from: source.indexOf('安祥'),
+                quote: '安祥',
+                to: source.indexOf('安祥') + 2,
+            },
+        ])
+    })
+
+    it('does not request analysis when markup leaves no prose', async () => {
+        const complete = vi.fn(async () => '{"issues":[]}')
+        await expect(
+            analyzeWriting({
+                client: {
+                    complete,
+                    listModels: vi.fn(async () => []),
+                    testConnection: vi.fn(async () => undefined),
+                },
+                config: {
+                    apiKey: 'key',
+                    baseUrl: 'https://example.com/v1',
+                    model: 'model',
+                },
+                content: '![示意图](https://example.com/a.png)\n[](https://example.com)',
+            })
+        ).resolves.toEqual([])
+        expect(complete).not.toHaveBeenCalled()
     })
 
     it('analyzes chunks sequentially and reports progress', async () => {

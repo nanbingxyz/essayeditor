@@ -39,7 +39,7 @@ export const WRITING_ANALYSIS_SYSTEM_PROMPT = `你是谨慎的中文写作分析
 1. 只报告你有很高把握的明显问题；有合理语境解释、需要更多上下文或仅属个人偏好时不要报告。
 2. 第一、二类 severity 必须是 hard；第四类必须是 style。
 3. hard 必须提供 suggestion，直接说明“应该是什么”；style 不得提供 suggestion，只说明这里或许存在的问题。
-4. quote 必须逐字复制输入原文中的连续片段，start/end 是该片段在 text 中的 UTF-16 下标，end 不包含末尾字符。
+4. quote 必须逐字复制输入正文中的连续片段，start/end 是该片段在 text 中的 UTF-16 下标，end 不包含末尾字符。输入已去掉 Markdown 标记、图片和链接地址，只含文章正文。
 5. 不要修改原文，不要输出总评，不要输出清单外的问题。
 6. 只输出一个 JSON 对象，不要使用 Markdown。格式：
 {"issues":[{"start":0,"end":2,"quote":"原文","category":"1.1","severity":"hard","message":"问题说明","suggestion":"应该是……","confidence":0.95}]}

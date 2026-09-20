@@ -18,10 +18,12 @@ afterEach(() => {
 
 function renderController({
     client,
+    content = '安祥离世',
     llmSettings,
     repository,
 }: {
     client: OpenAiCompatibleClient
+    content?: string
     llmSettings: LlmSettings
     repository: AnalysisRepository
 }) {
@@ -34,7 +36,7 @@ function renderController({
     function Harness() {
         controller = useAnalysisController({
             client,
-            content: '安祥离世',
+            content,
             documentKey: 'local:first',
             enabled: true,
             llmSettings,
@@ -86,6 +88,23 @@ describe('useAnalysisController', () => {
         await expect(getController().start()).resolves.toBe(
             'not-configured'
         )
+    })
+
+    it('does not start a request when the document has no analyzable prose', async () => {
+        const complete = vi.fn(async () => '{"issues":[]}')
+        const getController = renderController({
+            client: {
+                complete,
+                listModels: vi.fn(async () => []),
+                testConnection: vi.fn(async () => undefined),
+            },
+            content: '![示意图](https://example.com/a.png)',
+            llmSettings: verifiedSettings,
+            repository: createRepository(),
+        })
+        await act(async () => Promise.resolve())
+        await expect(getController().start()).resolves.toBe('empty')
+        expect(complete).not.toHaveBeenCalled()
     })
 
     it('saves valid completed results for the active document', async () => {

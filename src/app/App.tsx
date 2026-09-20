@@ -16,6 +16,7 @@ import {
   createAnalysisRepository,
   createContentFingerprint,
   createOpenAiCompatibleClient,
+  hasAnalyzableWriting,
   useAnalysisController,
 } from "@/features/analysis";
 import {
@@ -303,9 +304,18 @@ function AppContent() {
   const notifyAnalysisError = useCallback(
     (message: string) => {
       toast({
-        title: "写作分析失败",
+        title: "分析失败",
         description: message,
         variant: "destructive",
+      });
+    },
+    [toast],
+  );
+  const notifyAnalysisComplete = useCallback(
+    (issueCount: number) => {
+      toast({
+        title: `找到 ${issueCount} 处可优化点`,
+        variant: "success",
       });
     },
     [toast],
@@ -323,6 +333,7 @@ function AppContent() {
     documentKey: activeDocumentKey,
     enabled: Boolean(activeDocument && draft.ready),
     llmSettings: settings.llmSettings,
+    onComplete: notifyAnalysisComplete,
     onError: notifyAnalysisError,
     onSaveError: notifyAnalysisSaveError,
     repository: analysisRepository,
@@ -731,7 +742,7 @@ function AppContent() {
       });
     } else if (result === "empty") {
       toast({
-        description: "请先输入需要分析的文章内容",
+        description: "没有可分析的文字内容",
         variant: "destructive",
       });
     }
@@ -1305,7 +1316,7 @@ function AppContent() {
                 !activeDocument ||
                 !draft.ready ||
                 !localDraftsReady ||
-                !draft.content.trim() ||
+                !hasAnalyzableWriting(draft.content) ||
                 publishing.loading ||
                 updating ||
                 deleting,

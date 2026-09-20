@@ -20,6 +20,11 @@ export type {
 export {useAnalysisController} from './use-analysis-controller'
 export type {StartAnalysisResult} from './use-analysis-controller'
 export {
+    extractAnalysisText,
+    hasAnalyzableWriting,
+    mapExtractedRange,
+} from './extract-analysis-text'
+export {
     analyzeWriting,
     createAnalysisChunks,
     createContentFingerprint,

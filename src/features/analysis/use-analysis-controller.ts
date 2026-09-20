@@ -3,6 +3,7 @@ import {useCallback, useEffect, useRef, useState} from 'react'
 import type {LlmSettings} from '@/features/settings'
 
 import {WRITING_CHECKLIST_VERSION} from './checklist'
+import {hasAnalyzableWriting} from './extract-analysis-text'
 import type {
     OpenAiCompatibleClient,
     OpenAiConfig,
@@ -28,6 +29,7 @@ interface AnalysisControllerOptions {
     enabled: boolean
     llmSettings: LlmSettings
     onError: (message: string) => void
+    onComplete?: (issueCount: number) => void
     onSaveError: () => void
     repository: AnalysisRepository
 }
@@ -52,6 +54,7 @@ export function useAnalysisController({
     documentKey,
     enabled,
     llmSettings,
+    onComplete,
     onError,
     onSaveError,
     repository,
@@ -70,12 +73,14 @@ export function useAnalysisController({
         issues: AnalysisIssue[]
     }>()
     const loadGenerationRef = useRef(0)
+    const onCompleteRef = useRef(onComplete)
     const onErrorRef = useRef(onError)
     const onSaveErrorRef = useRef(onSaveError)
 
     documentKeyRef.current = documentKey
     contentRef.current = content
     issuesRef.current = issues
+    onCompleteRef.current = onComplete
     onErrorRef.current = onError
     onSaveErrorRef.current = onSaveError
 
@@ -187,7 +192,7 @@ export function useAnalysisController({
         }
         const targetContent = contentRef.current
         const targetDocumentKey = documentKeyRef.current
-        if (!targetContent.trim()) {
+        if (!hasAnalyzableWriting(targetContent)) {
             return 'empty'
         }
 
@@ -219,6 +224,7 @@ export function useAnalysisController({
                 issuesRef.current = nextIssues
                 setIssues(nextIssues)
                 setStatus('completed')
+                onCompleteRef.current?.(nextIssues.length)
             })
             .catch((error) => {
                 if (request.signal.aborted) {
