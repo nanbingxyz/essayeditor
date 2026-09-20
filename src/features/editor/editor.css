@@ -44,7 +44,7 @@
 
 .markdown-editor .cm-scroller {
     overflow: auto;
-    font-family: 'Noto Serif SC Variable', serif;
+    font-family: "Noto Serif SC Variable", serif;
     font-size: 16px;
     line-height: 30px;
 }
@@ -58,7 +58,7 @@
 .markdown-editor .cm-line {
     min-height: 30px;
     padding: 0;
-    font-family: 'Noto Serif SC Variable', serif;
+    font-family: "Noto Serif SC Variable", serif;
 }
 
 .markdown-editor .cm-placeholder {
@@ -75,8 +75,108 @@
     border-left-color: hsl(var(--foreground));
 }
 
-.markdown-editor .cm-content[aria-readonly='true'] {
+.markdown-editor .cm-content[aria-readonly="true"] {
     opacity: 0.65;
+}
+
+.markdown-editor .cm-analysis-issue {
+    text-decoration-line: underline;
+    text-decoration-style: wavy;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+}
+
+.markdown-editor .cm-analysis-hard {
+    text-decoration-color: hsl(var(--destructive));
+}
+
+.markdown-editor .cm-analysis-style {
+    text-decoration-color: hsl(43 92% 48%);
+}
+
+.cm-tooltip:has(.cm-analysis-tooltip) {
+    overflow: hidden;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    box-shadow: 0 12px 30px hsl(var(--foreground) / 0.16);
+}
+
+.cm-analysis-tooltip {
+    width: min(360px, calc(100vw - 32px));
+    max-height: min(360px, 60vh);
+    overflow-y: auto;
+    padding: 4px 12px;
+    font-family: "Barlow", sans-serif;
+}
+
+.cm-analysis-tooltip ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cm-analysis-tooltip li {
+    padding: 10px 0;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.cm-analysis-tooltip li:last-child {
+    border-bottom: 0;
+}
+
+.cm-analysis-tooltip-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.cm-analysis-tooltip-header button {
+    margin-left: auto;
+    border: 0;
+    color: hsl(var(--muted-foreground));
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: "Barlow", sans-serif;
+}
+
+.cm-analysis-tooltip-header button:hover {
+    color: hsl(var(--destructive));
+}
+
+.cm-analysis-badge {
+    padding: 1px 6px;
+    border-radius: 999px;
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.cm-analysis-badge.is-hard {
+    background: hsl(var(--destructive));
+}
+
+.cm-analysis-badge.is-style {
+    color: hsl(30 30% 15%);
+    background: hsl(43 92% 48%);
+}
+
+.cm-analysis-category {
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+}
+
+.cm-analysis-tooltip p {
+    margin: 7px 0 0;
+    font-family: "Barlow", sans-serif;
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+.cm-analysis-tooltip .cm-analysis-suggestion {
+    color: hsl(var(--muted-foreground));
 }
 
 .markdown-editor .cm-md-heading {
@@ -118,7 +218,7 @@
     display: inline-block;
     min-width: 1.25em;
     color: hsl(var(--muted-foreground));
-    font-family: 'Noto Serif SC Variable', serif;
+    font-family: "Noto Serif SC Variable", serif;
 }
 
 .markdown-editor .cm-md-horizontal-rule {
@@ -132,7 +232,7 @@
     width: 100%;
     height: 1px;
     background: hsl(var(--border));
-    content: '';
+    content: "";
 }
 
 .markdown-editor .cm-md-image-preview {
@@ -162,7 +262,7 @@
     border: 1px dashed hsl(var(--border));
     color: hsl(var(--muted-foreground));
     background: hsl(var(--card) / 0.35);
-    font-family: 'Barlow', sans-serif;
+    font-family: "Barlow", sans-serif;
     font-size: 13px;
 }
 
@@ -172,7 +272,7 @@
     border: 1px dashed hsl(var(--border));
     color: hsl(var(--muted-foreground));
     background: hsl(var(--card) / 0.55);
-    font-family: 'Barlow', sans-serif;
+    font-family: "Barlow", sans-serif;
     font-size: 13px;
 }
 
@@ -187,7 +287,7 @@
 .markdown-editor .cm-md-table-preview table {
     width: 100%;
     border-collapse: collapse;
-    font-family: 'Noto Serif SC Variable', serif;
+    font-family: "Noto Serif SC Variable", serif;
     font-size: 14px;
     line-height: 1.65;
 }
@@ -259,7 +359,7 @@
     box-sizing: border-box;
     color: #242424;
     background: #ffffff;
-    font-family: 'Noto Serif SC Variable', 'Noto Serif SC', serif;
+    font-family: "Noto Serif SC Variable", "Noto Serif SC", serif;
     font-size: 15px;
     line-height: 1.75;
     overflow-wrap: anywhere;

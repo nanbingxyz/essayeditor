@@ -2,4 +2,9 @@ export {default as SettingsPage} from './settings-page'
 export {createSettingsRepository} from './settings-repository'
 export type {SettingsRepository} from './settings-repository'
 export {useSettingsController} from './use-settings-controller'
-export type {ApiKeySaveStatus, Appearance} from './model'
+export type {
+    ApiKeySaveStatus,
+    Appearance,
+    LlmActionStatus,
+    LlmSettings,
+} from './model'

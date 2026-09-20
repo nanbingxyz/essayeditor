@@ -15,8 +15,13 @@ import {
     useRef,
 } from 'react'
 
+import type {AnalysisIssue} from '@/features/analysis/model'
 import {tauriDesktopAdapter} from '@/shared/platform/desktop'
 
+import {
+    analysisDecorations,
+    setEditorAnalysisIssues,
+} from './analysis-decorations'
 import {
     markdownFormatKeymap,
     markdownLivePreview,
@@ -39,10 +44,15 @@ export interface MarkdownEditorReadyMetrics {
 }
 
 interface MarkdownEditorProps {
+    analysisIssues?: AnalysisIssue[]
     ariaLabel?: string
     disabled?: boolean
     documentKey?: string
     initialValue?: string
+    onAnalysisIssuesChange?: (
+        issues: AnalysisIssue[],
+        content: string
+    ) => void
     onChange?: (content: string) => void
     onReady?: (
         documentKey: string,
@@ -55,10 +65,12 @@ interface MarkdownEditorProps {
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     (
         {
+            analysisIssues = [],
             ariaLabel = '文章内容',
             disabled = false,
             documentKey = 'default',
             initialValue = '',
+            onAnalysisIssuesChange,
             onChange,
             onReady,
             placeholder = '从这里开始...',
@@ -69,6 +81,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         const rootRef = useRef<HTMLDivElement>(null)
         const viewRef = useRef<EditorView>()
         const onChangeRef = useRef(onChange)
+        const onAnalysisIssuesChangeRef = useRef(
+            onAnalysisIssuesChange
+        )
         const onReadyRef = useRef(onReady)
         const historyCompartmentRef = useRef(new Compartment())
         const readOnlyCompartmentRef = useRef(new Compartment())
@@ -79,6 +94,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         const editorValue = value ?? initialValue
 
         onChangeRef.current = onChange
+        onAnalysisIssuesChangeRef.current = onAnalysisIssuesChange
         onReadyRef.current = onReady
         configRef.current = {ariaLabel, disabled, placeholder}
 
@@ -101,6 +117,14 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
                         openExternal: (url) =>
                             void tauriDesktopAdapter.openExternal(url),
                         revealSyntaxOnInitialSelection: false,
+                    }),
+                    analysisDecorations((issues) => {
+                        if (!applyingValueRef.current) {
+                            onAnalysisIssuesChangeRef.current?.(
+                                issues,
+                                viewRef.current?.state.doc.toString() ?? ''
+                            )
+                        }
                     }),
                     EditorView.contentAttributes.of({
                         'aria-label': config.ariaLabel,
@@ -272,6 +296,13 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         useEffect(() => {
             setReadOnly(disabled)
         }, [disabled])
+
+        useLayoutEffect(() => {
+            const view = viewRef.current
+            if (view) {
+                setEditorAnalysisIssues(view, analysisIssues)
+            }
+        }, [analysisIssues, documentKey])
 
         return <div ref={rootRef} className="markdown-editor" />
     }

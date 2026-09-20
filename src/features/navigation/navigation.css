@@ -279,6 +279,30 @@ html[data-platform='macos'] .sidebar-is-hidden .main-titlebar {
     color: hsl(var(--muted-foreground));
 }
 
+.editor-analysis-button,
+.editor-analysis-cancel-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: hsl(var(--muted-foreground));
+}
+
+.editor-analysis-button:not(:disabled):hover {
+    color: hsl(var(--foreground));
+}
+
+.editor-analysis-button:disabled {
+    opacity: 0.5;
+}
+
+.editor-analysis-button.is-running {
+    opacity: 1;
+}
+
+.editor-analysis-cancel-button:hover {
+    color: hsl(var(--destructive));
+}
+
 .editor-open-button:hover {
     color: hsl(var(--foreground));
 }

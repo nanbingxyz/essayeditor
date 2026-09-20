@@ -3,6 +3,7 @@ import { Send20Filled, EyeOff20Filled, EyeOff20Regular } from '@fluentui/react-i
 import { forwardRef } from 'react'
 import { Button, Toggle } from '@/shared/ui'
 import { getRelativeTime } from '@/shared/lib/timing'
+import type { AnalysisIssue } from '@/features/analysis/model'
 
 import MarkdownEditor, {
     type MarkdownEditorHandle,
@@ -12,6 +13,7 @@ import { cn } from '@/shared/lib'
 
 interface EditorPageProps {
     active: boolean
+    analysisIssues: AnalysisIssue[]
     actionLabel: string
     backupTimestamp: number
     content: string
@@ -20,6 +22,10 @@ interface EditorPageProps {
     isPrivate: boolean
     loading: boolean
     onContentChange: (content: string) => void
+    onAnalysisIssuesChange: (
+        issues: AnalysisIssue[],
+        content: string
+    ) => void
     onEditorReady?: (
         documentKey: string,
         metrics?: MarkdownEditorReadyMetrics
@@ -34,6 +40,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
     (
         {
             active,
+            analysisIssues,
             actionLabel,
             backupTimestamp,
             content,
@@ -42,6 +49,7 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
             isPrivate,
             loading,
             onContentChange,
+            onAnalysisIssuesChange,
             onEditorReady,
             onPrivateChange,
             onPublish,
@@ -54,10 +62,12 @@ const EditorPage = forwardRef<MarkdownEditorHandle, EditorPageProps>(
             {ready ? (
                 <MarkdownEditor
                     ref={ref}
+                    analysisIssues={analysisIssues}
                     documentKey={documentKey}
                     value={content}
                     disabled={disabled}
                     onChange={onContentChange}
+                    onAnalysisIssuesChange={onAnalysisIssuesChange}
                     onReady={onEditorReady}
                 />
             ) : (

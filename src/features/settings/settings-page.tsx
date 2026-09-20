@@ -6,6 +6,7 @@ import {
     MoonIcon,
     OpenInNewWindowIcon,
     QuestionMarkCircledIcon,
+    ReloadIcon,
     SunIcon,
 } from '@radix-ui/react-icons'
 import { DarkThemeRegular } from '@fluentui/react-icons'
@@ -15,16 +16,34 @@ import { SettingsUpdateSection } from '@/features/updater'
 import { cn } from '@/shared/lib'
 import { Button, Input, Label } from '@/shared/ui'
 import { tauriDesktopAdapter } from '@/shared/platform/desktop'
-import type { ApiKeySaveStatus, Appearance } from './model'
+import type {
+    ApiKeySaveStatus,
+    Appearance,
+    LlmActionStatus,
+    LlmSettings,
+} from './model'
 
 interface SettingsPageProps {
     appearance: Appearance
     disabled: boolean
+    llm: LlmSettings
+    llmSaveStatus: ApiKeySaveStatus
+    modelError: string
+    models: string[]
+    modelStatus: LlmActionStatus
     onAppearanceChange: (appearance: Appearance) => void
     onBack: () => void | Promise<void>
     onBlur: () => void
     onChange: (value: string) => void
+    onDiscoverModels: () => void
+    onLlmApiKeyChange: (value: string) => void
+    onLlmBaseUrlChange: (value: string) => void
+    onLlmBlur: () => void
+    onLlmModelChange: (value: string) => void
+    onTestLlm: () => void
     saveStatus: ApiKeySaveStatus
+    testError: string
+    testStatus: LlmActionStatus
     value: string
 }
 
@@ -38,14 +57,28 @@ const saveStatusCopy: Record<ApiKeySaveStatus, string> = {
 export default function SettingsPage({
     appearance,
     disabled,
+    llm,
+    llmSaveStatus,
+    modelError,
+    models,
+    modelStatus,
     onAppearanceChange,
     onBack,
     onBlur,
     onChange,
+    onDiscoverModels,
+    onLlmApiKeyChange,
+    onLlmBaseUrlChange,
+    onLlmBlur,
+    onLlmModelChange,
+    onTestLlm,
     saveStatus,
+    testError,
+    testStatus,
     value,
 }: SettingsPageProps) {
     const [showApiKey, setShowApiKey] = useState(false)
+    const [showLlmApiKey, setShowLlmApiKey] = useState(false)
 
     return (
         <div className="settings-page flex flex-col">
@@ -154,6 +187,151 @@ export default function SettingsPage({
                 >
                     {saveStatusCopy[saveStatus]}
                 </p>
+            </section>
+
+            <section
+                className="settings-section llm-settings-section"
+                aria-labelledby="llm-settings-heading"
+            >
+                <div className="settings-section-copy">
+                    <h2 id="llm-settings-heading">大模型</h2>
+                    <p>
+                        配置兼容 OpenAI API 的服务。Base URL 通常以 /v1
+                        结尾。
+                    </p>
+                </div>
+
+                <div className="llm-settings-fields">
+                    <Label htmlFor="llm-base-url">Base URL</Label>
+                    <Input
+                        id="llm-base-url"
+                        value={llm.baseUrl}
+                        disabled={disabled}
+                        placeholder="https://api.openai.com/v1"
+                        spellCheck={false}
+                        onChange={(event) =>
+                            onLlmBaseUrlChange(event.target.value)
+                        }
+                        onBlur={onLlmBlur}
+                    />
+
+                    <Label htmlFor="llm-api-key">API Key</Label>
+                    <div className="api-key-field">
+                        <Input
+                            id="llm-api-key"
+                            type={showLlmApiKey ? 'text' : 'password'}
+                            value={llm.apiKey}
+                            disabled={disabled}
+                            placeholder="输入大模型 API Key"
+                            autoComplete="off"
+                            spellCheck={false}
+                            onChange={(event) =>
+                                onLlmApiKeyChange(event.target.value)
+                            }
+                            onBlur={onLlmBlur}
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={disabled}
+                            aria-label={
+                                showLlmApiKey
+                                    ? '隐藏大模型 API Key'
+                                    : '显示大模型 API Key'
+                            }
+                            onClick={() =>
+                                setShowLlmApiKey((visible) => !visible)
+                            }
+                        >
+                            {showLlmApiKey ? (
+                                <EyeClosedIcon />
+                            ) : (
+                                <EyeOpenIcon />
+                            )}
+                        </Button>
+                    </div>
+
+                    <div className="llm-model-heading">
+                        <Label htmlFor="llm-model">模型</Label>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={disabled || modelStatus === 'loading'}
+                            onClick={onDiscoverModels}
+                        >
+                            <ReloadIcon
+                                className={
+                                    modelStatus === 'loading'
+                                        ? 'animate-spin'
+                                        : undefined
+                                }
+                            />
+                            获取模型
+                        </Button>
+                    </div>
+                    {models.length > 0 ? (
+                        <select
+                            id="llm-model"
+                            value={llm.model}
+                            disabled={disabled}
+                            onChange={(event) =>
+                                onLlmModelChange(event.target.value)
+                            }
+                        >
+                            {models.map((model) => (
+                                <option key={model} value={model}>
+                                    {model}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <Input
+                            id="llm-model"
+                            value={llm.model}
+                            disabled={disabled}
+                            placeholder="手动填写模型名称"
+                            spellCheck={false}
+                            onChange={(event) =>
+                                onLlmModelChange(event.target.value)
+                            }
+                        />
+                    )}
+
+                    {modelStatus === 'error' && (
+                        <p className="llm-inline-status is-error">
+                            {modelError}
+                        </p>
+                    )}
+                    <div className="llm-test-row">
+                        <Button
+                            type="button"
+                            disabled={
+                                disabled || testStatus === 'loading'
+                            }
+                            onClick={onTestLlm}
+                        >
+                            {testStatus === 'loading'
+                                ? '正在测试…'
+                                : '测试连接'}
+                        </Button>
+                        <span
+                            className={cn(
+                                'llm-inline-status',
+                                testStatus === 'error' && 'is-error',
+                                testStatus === 'success' && 'is-success'
+                            )}
+                            aria-live="polite"
+                        >
+                            {testStatus === 'success'
+                                ? '配置正确'
+                                : testStatus === 'error'
+                                  ? testError
+                                  : saveStatusCopy[llmSaveStatus]}
+                        </span>
+                    </div>
+                </div>
             </section>
 
             <section

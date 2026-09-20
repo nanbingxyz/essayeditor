@@ -216,6 +216,137 @@ describe('App navigation', () => {
             .not.toContain('is-page-hidden')
     })
 
+    it('locks editing during analysis and persists completed findings', async () => {
+        storeFiles.set(
+            'store.bin',
+            new Map<string, unknown>([
+                ['appearance', 'system'],
+                [
+                    'llmSettings',
+                    {
+                        apiKey: 'llm-key',
+                        baseUrl: 'https://example.com/v1',
+                        model: 'model-a',
+                        verified: true,
+                    },
+                ],
+            ])
+        )
+        storeFiles.set(
+            'drafts.bin',
+            new Map([
+                [
+                    'localDrafts',
+                    {
+                        version: 2,
+                        drafts: [
+                            {
+                                localId: 'analyzed',
+                                content: '安祥离世',
+                                createdAt: 1,
+                                isPrivate: false,
+                                themeId: null,
+                                updatedAt: 1,
+                            },
+                        ],
+                    },
+                ],
+            ])
+        )
+        let finishAnalysis: ((response: Response) => void) | undefined
+        const analysisResponse = new Promise<Response>((resolve) => {
+            finishAnalysis = resolve
+        })
+        httpFetch.mockImplementation(async (input: string) => {
+            if (input.endsWith('/models')) {
+                return new Response(
+                    JSON.stringify({data: [{id: 'model-a'}]}),
+                    {status: 200}
+                )
+            }
+            return analysisResponse
+        })
+
+        const container = document.body.appendChild(
+            document.createElement('div')
+        )
+        const root = createRoot(container)
+        roots.push(root)
+        await act(async () => {
+            root.render(<App />)
+            await settle(12)
+        })
+
+        const analyze = container.querySelector(
+            'button[aria-label="分析文章"]'
+        ) as HTMLButtonElement
+        expect(analyze.disabled).toBe(false)
+        await act(async () => {
+            analyze.click()
+            await settle()
+        })
+        expect(
+            container.querySelector('.cm-content')?.getAttribute(
+                'aria-readonly'
+            )
+        ).toBe('true')
+        expect(
+            container.querySelector('button[aria-label="取消分析"]')
+        ).not.toBeNull()
+
+        await act(async () => {
+            finishAnalysis?.(
+                new Response(
+                    JSON.stringify({
+                        choices: [
+                            {
+                                message: {
+                                    content: JSON.stringify({
+                                        issues: [
+                                            {
+                                                start: 0,
+                                                end: 2,
+                                                quote: '安祥',
+                                                category: '1.1',
+                                                severity: 'hard',
+                                                message: '同音字误用',
+                                                suggestion:
+                                                    '“安祥”应该是“安详”',
+                                                confidence: 0.99,
+                                            },
+                                        ],
+                                    }),
+                                },
+                            },
+                        ],
+                    }),
+                    {status: 200}
+                )
+            )
+            await settle(12)
+        })
+
+        expect(
+            container.querySelector('.cm-content')?.getAttribute(
+                'aria-readonly'
+            )
+        ).not.toBe('true')
+        expect(container.querySelector('.cm-analysis-hard')).not.toBeNull()
+        expect(
+            storeFiles
+                .get('analysis.bin')
+                ?.get('analysis:local:analyzed')
+        ).toMatchObject({
+            documentKey: 'local:analyzed',
+            issues: [
+                expect.objectContaining({
+                    quote: '安祥',
+                    severity: 'hard',
+                }),
+            ],
+        })
+    })
+
     it('creates multiple local drafts and reuses an existing blank one', async () => {
         storeFiles.set(
             'drafts.bin',

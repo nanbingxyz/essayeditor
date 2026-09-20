@@ -18,12 +18,27 @@ function createStore(values: Record<string, unknown>): KeyValueStore {
 describe('SettingsRepository', () => {
     it('normalizes loaded settings and invalid appearances', async () => {
         const repository = createSettingsRepository(async () =>
-            createStore({accessToken: '  token  ', appearance: 'sepia'})
+            createStore({
+                accessToken: '  token  ',
+                appearance: 'sepia',
+                llmSettings: {
+                    apiKey: ' llm-key ',
+                    baseUrl: ' https://example.com/v1/ ',
+                    model: ' model-a ',
+                    verified: true,
+                },
+            })
         )
 
         await expect(repository.load()).resolves.toEqual({
             accessToken: 'token',
             appearance: 'system',
+            llm: {
+                apiKey: 'llm-key',
+                baseUrl: 'https://example.com/v1',
+                model: 'model-a',
+                verified: true,
+            },
         })
     })
 
@@ -33,9 +48,21 @@ describe('SettingsRepository', () => {
 
         await repository.saveAccessToken('token')
         await repository.saveAppearance('dark')
+        await repository.saveLlmSettings({
+            apiKey: ' llm-key ',
+            baseUrl: 'https://example.com/v1/',
+            model: ' model ',
+            verified: true,
+        })
 
         expect(store.set).toHaveBeenNthCalledWith(1, 'accessToken', 'token')
         expect(store.set).toHaveBeenNthCalledWith(2, 'appearance', 'dark')
-        expect(store.save).toHaveBeenCalledTimes(2)
+        expect(store.set).toHaveBeenNthCalledWith(3, 'llmSettings', {
+            apiKey: 'llm-key',
+            baseUrl: 'https://example.com/v1',
+            model: 'model',
+            verified: true,
+        })
+        expect(store.save).toHaveBeenCalledTimes(3)
     })
 })

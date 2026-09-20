@@ -9,12 +9,13 @@ import SettingsPage from './settings-page'
 
 const roots: Root[] = []
 
-function renderSettings(disabled = false) {
+function renderSettings(disabled = false, models: string[] = []) {
     const container = document.createElement('div')
     document.body.append(container)
     const root = createRoot(container)
     roots.push(root)
     const onAppearanceChange = vi.fn()
+    const onTestLlm = vi.fn()
     const updaterService: UpdaterService = {
         check: vi.fn(async () => null),
         getVersion: vi.fn(() => new Promise<string>(() => undefined)),
@@ -28,17 +29,35 @@ function renderSettings(disabled = false) {
                     value=""
                     saveStatus="idle"
                     disabled={disabled}
+                    llm={{
+                        apiKey: '',
+                        baseUrl: '',
+                        model: models[0] ?? '',
+                        verified: false,
+                    }}
+                    llmSaveStatus="idle"
+                    modelError=""
+                    models={models}
+                    modelStatus="idle"
                     appearance="system"
                     onChange={vi.fn()}
                     onBlur={vi.fn()}
+                    onDiscoverModels={vi.fn()}
+                    onLlmApiKeyChange={vi.fn()}
+                    onLlmBaseUrlChange={vi.fn()}
+                    onLlmBlur={vi.fn()}
+                    onLlmModelChange={vi.fn()}
+                    onTestLlm={onTestLlm}
                     onAppearanceChange={onAppearanceChange}
                     onBack={vi.fn()}
+                    testError=""
+                    testStatus="idle"
                 />
             </UpdaterProvider>
         )
     )
 
-    return {container, onAppearanceChange}
+    return {container, onAppearanceChange, onTestLlm}
 }
 
 afterEach(() => {
@@ -104,5 +123,27 @@ describe('SettingsPage appearance controls', () => {
                 )
             ).every((input) => input.disabled)
         ).toBe(true)
+    })
+
+    it('falls back to manual model input and renders discovered models when available', () => {
+        const manual = renderSettings()
+        expect(
+            manual.container.querySelector(
+                'input[placeholder="手动填写模型名称"]'
+            )
+        ).not.toBeNull()
+        const testButton = Array.from(
+            manual.container.querySelectorAll('button')
+        ).find((button) => button.textContent === '测试连接')
+        act(() => testButton?.click())
+        expect(manual.onTestLlm).toHaveBeenCalled()
+
+        const discovered = renderSettings(false, ['model-a', 'model-b'])
+        const select = discovered.container.querySelector(
+            '#llm-model'
+        ) as HTMLSelectElement
+        expect(Array.from(select.options).map((option) => option.value)).toEqual(
+            ['model-a', 'model-b']
+        )
     })
 })

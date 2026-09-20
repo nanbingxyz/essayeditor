@@ -3,6 +3,7 @@ import {act} from 'react-dom/test-utils'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
 import type {DesktopAdapter} from '@/shared/platform/desktop'
+import type {OpenAiCompatibleClient} from '@/features/analysis'
 
 import type {SettingsRepository} from './settings-repository'
 import type {SettingsSnapshot} from './model'
@@ -14,7 +15,8 @@ const roots: Root[] = []
 
 function renderController(
     repository: SettingsRepository,
-    desktop: DesktopAdapter
+    desktop: DesktopAdapter,
+    llmClient?: OpenAiCompatibleClient
 ) {
     const root = createRoot(document.body.appendChild(document.createElement('div')))
     roots.push(root)
@@ -25,6 +27,7 @@ function renderController(
     function Harness() {
         controller = useSettingsController({
             desktop,
+            llmClient,
             repository,
             onAppearanceSaveError,
             onLoadError,
@@ -61,10 +64,17 @@ describe('useSettingsController', () => {
                 async (): Promise<SettingsSnapshot> => ({
                     accessToken: 'stored',
                     appearance: 'dark',
+                    llm: {
+                        apiKey: '',
+                        baseUrl: '',
+                        model: '',
+                        verified: false,
+                    },
                 })
             ),
             saveAccessToken: vi.fn(async () => undefined),
             saveAppearance: vi.fn(async () => undefined),
+            saveLlmSettings: vi.fn(async () => undefined),
         }
         const desktop: DesktopAdapter = {
             exportMarkdown: vi.fn(async () => false),
@@ -103,12 +113,19 @@ describe('useSettingsController', () => {
                 async (): Promise<SettingsSnapshot> => ({
                     accessToken: '',
                     appearance: 'system',
+                    llm: {
+                        apiKey: '',
+                        baseUrl: '',
+                        model: '',
+                        verified: false,
+                    },
                 })
             ),
             saveAccessToken: vi.fn(async () => undefined),
             saveAppearance: vi.fn(async () => {
                 throw new Error('disk full')
             }),
+            saveLlmSettings: vi.fn(async () => undefined),
         }
         const desktop: DesktopAdapter = {
             exportMarkdown: vi.fn(async () => false),
@@ -133,5 +150,65 @@ describe('useSettingsController', () => {
         expect(getController().appearance).toBe('dark')
         expect(document.documentElement.dataset.theme).toBe('dark')
         expect(onAppearanceSaveError).toHaveBeenCalled()
+    })
+
+    it('discovers models, verifies the selected model, and invalidates changed configuration', async () => {
+        const repository: SettingsRepository = {
+            load: vi.fn(
+                async (): Promise<SettingsSnapshot> => ({
+                    accessToken: '',
+                    appearance: 'system',
+                    llm: {
+                        apiKey: '',
+                        baseUrl: '',
+                        model: '',
+                        verified: false,
+                    },
+                })
+            ),
+            saveAccessToken: vi.fn(async () => undefined),
+            saveAppearance: vi.fn(async () => undefined),
+            saveLlmSettings: vi.fn(async () => undefined),
+        }
+        const desktop: DesktopAdapter = {
+            exportMarkdown: vi.fn(async () => false),
+            exportDocx: vi.fn(async () => false),
+            exportPdf: vi.fn(async () => false),
+            interceptClose: vi.fn(async () => () => undefined),
+            openExternal: vi.fn(async () => undefined),
+            setWindowAppearance: vi.fn(async () => undefined),
+            showMainWindow: vi.fn(async () => undefined),
+        }
+        const llmClient: OpenAiCompatibleClient = {
+            complete: vi.fn(async () => ''),
+            listModels: vi.fn(async () => ['model-a', 'model-b']),
+            testConnection: vi.fn(async () => undefined),
+        }
+        const {getController} = renderController(
+            repository,
+            desktop,
+            llmClient
+        )
+        await act(async () => Promise.resolve())
+
+        act(() => {
+            getController().changeLlmBaseUrl('https://example.com/v1')
+            getController().changeLlmApiKey('secret')
+        })
+        await act(async () => {
+            await getController().discoverModels()
+        })
+        expect(getController().models).toEqual(['model-a', 'model-b'])
+        expect(getController().llmSettings.model).toBe('model-a')
+
+        await act(async () => {
+            await getController().testLlmConnection()
+        })
+        expect(getController().llmSettings.verified).toBe(true)
+        expect(getController().testStatus).toBe('success')
+
+        act(() => getController().changeLlmModel('model-b'))
+        expect(getController().llmSettings.verified).toBe(false)
+        expect(getController().testStatus).toBe('idle')
     })
 })

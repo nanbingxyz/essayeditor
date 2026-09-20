@@ -123,6 +123,72 @@
     margin-top: 38px;
 }
 
+.llm-settings-section {
+    margin-top: 38px;
+}
+
+.llm-settings-fields {
+    display: grid;
+    gap: 9px;
+}
+
+.llm-settings-fields > label,
+.llm-model-heading label {
+    color: hsl(var(--foreground));
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.llm-settings-fields > input,
+.llm-settings-fields > select {
+    height: 42px;
+    border: 1px solid hsl(var(--input));
+    border-radius: var(--radius);
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+}
+
+.llm-settings-fields > select {
+    padding: 0 12px;
+}
+
+.llm-model-heading,
+.llm-test-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.llm-model-heading {
+    margin-top: 5px;
+}
+
+.llm-model-heading button {
+    gap: 6px;
+}
+
+.llm-test-row {
+    justify-content: flex-start;
+    min-height: 38px;
+    margin-top: 4px;
+}
+
+.llm-inline-status {
+    margin: 0;
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.llm-inline-status.is-error {
+    color: hsl(var(--destructive));
+}
+
+.llm-inline-status.is-success {
+    color: hsl(142 55% 40%);
+}
+
 .update-section {
     margin-top: 38px;
 }
